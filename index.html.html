@@ -1,0 +1,1467 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Painel B2C — Gestão Mensal</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<style>
+:root{
+  --bg:#F8F7FF;
+  --surface:#FFFFFF;
+  --surface2:#F3F0FF;
+  --border:#E4DDFF;
+  --border2:#C9BFFF;
+  --text:#1A1530;
+  --text2:#5B5280;
+  --text3:#9B93C0;
+  --sidebar:#2D1B69;
+  --sidebar2:#3D2882;
+  --sidebar-active:rgba(255,255,255,0.15);
+  --accent:#6D28D9;
+  --accent2:#7C3AED;
+  --accent3:#8B5CF6;
+  --accent-light:#EDE9FE;
+  --accent-mid:#C4B5FD;
+  --lilac:#A78BFA;
+  --red:#C0392B;--red-bg:#FAEAE8;
+  --green:#1A6B3A;--green-bg:#E6F4EC;
+  --amber:#8B5E0A;--amber-bg:#FEF4E0;
+  --blue:#1A4A7A;--blue-bg:#E8F0FA;
+  --radius:10px;--radius-lg:16px;
+  --shadow:0 1px 3px rgba(109,40,217,0.08),0 4px 16px rgba(109,40,217,0.06);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;}
+.layout{display:grid;grid-template-columns:224px 1fr;min-height:100vh;}
+
+/* SIDEBAR — deep purple */
+.sidebar{background:var(--sidebar);color:#fff;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;}
+.sidebar-logo{padding:28px 22px 20px;border-bottom:1px solid rgba(255,255,255,0.1);}
+.sidebar-logo .title{font-family:'DM Serif Display',serif;font-size:22px;color:#fff;line-height:1.2;}
+.sidebar-logo .sub{font-size:11px;color:rgba(255,255,255,0.4);margin-top:4px;letter-spacing:0.08em;text-transform:uppercase;}
+.sidebar-nav{padding:14px 12px;flex:1;overflow-y:auto;}
+.nav-section{font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(255,255,255,0.3);padding:14px 12px 6px;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;color:rgba(255,255,255,0.65);cursor:pointer;font-size:13px;transition:all 0.15s;margin-bottom:2px;border:none;background:none;width:100%;text-align:left;font-family:'DM Sans',sans-serif;}
+.nav-item:hover{background:rgba(255,255,255,0.09);color:#fff;}
+.nav-item.active{background:rgba(255,255,255,0.16);color:#fff;font-weight:500;}
+.nav-icon{width:16px;height:16px;flex-shrink:0;opacity:0.65;}
+.nav-item.active .nav-icon{opacity:1;}
+.sidebar-footer{padding:16px;border-top:1px solid rgba(255,255,255,0.08);}
+.sidebar-footer .version{font-size:11px;color:rgba(255,255,255,0.25);}
+
+/* MAIN */
+.main{padding:32px 36px;overflow-y:auto;}
+.page{display:none;}.page.active{display:block;}
+.page-header{margin-bottom:28px;}
+.page-header h1{font-family:'DM Serif Display',serif;font-size:28px;color:var(--accent);font-weight:400;}
+.page-header p{font-size:13px;color:var(--text2);margin-top:4px;}
+
+/* CARDS */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px 22px;box-shadow:var(--shadow);margin-bottom:16px;}
+.card-title{font-size:11px;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:14px;}
+.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+.grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:16px;}
+
+/* METRIC CARDS */
+.metric-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px 18px;}
+.metric-card .m-label{font-size:11px;color:var(--accent3);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:7px;}
+.metric-card .m-value{font-size:20px;font-weight:600;color:var(--accent);line-height:1;}
+.metric-card .m-delta{font-size:12px;margin-top:5px;}
+.delta-up{color:var(--green);}.delta-down{color:var(--red);}
+
+/* PURPLE METRIC (highlighted) */
+.metric-purple{background:linear-gradient(135deg,#4C1D95,#6D28D9);border:none;border-radius:var(--radius-lg);padding:16px 18px;}
+.metric-purple .m-label{font-size:11px;color:rgba(255,255,255,0.6);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:7px;}
+.metric-purple .m-value{font-size:20px;font-weight:600;color:#fff;line-height:1;}
+.metric-purple .m-delta{font-size:12px;margin-top:5px;color:rgba(255,255,255,0.75);}
+
+.chart-container{position:relative;width:100%;}
+.month-bar{display:flex;align-items:center;gap:12px;margin-bottom:24px;flex-wrap:wrap;}
+.month-bar label{font-size:13px;color:var(--text2);}
+.month-bar select{font-family:'DM Sans',sans-serif;font-size:13px;padding:7px 12px;border:1px solid var(--border2);border-radius:var(--radius);background:var(--surface);color:var(--text);cursor:pointer;outline:none;}
+.month-bar select:focus{border-color:var(--accent);}
+
+/* TABLE */
+.table-wrap{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+thead th{font-size:11px;font-weight:500;color:var(--accent3);text-transform:uppercase;letter-spacing:0.06em;padding:8px 12px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap;}
+tbody td{padding:9px 12px;border-bottom:1px solid var(--border);color:var(--text);white-space:nowrap;}
+tbody td.cat{color:var(--text3);font-size:12px;}
+tbody tr:last-child td{border-bottom:none;}
+tbody tr:hover td{background:var(--surface2);}
+
+/* BADGES */
+.badge{display:inline-flex;align-items:center;font-size:11px;font-weight:500;padding:2px 8px;border-radius:20px;}
+.badge-green{background:var(--green-bg);color:var(--green);}
+.badge-red{background:var(--red-bg);color:var(--red);}
+.badge-amber{background:var(--amber-bg);color:var(--amber);}
+.badge-blue{background:var(--blue-bg);color:var(--blue);}
+.badge-purple{background:var(--accent-light);color:var(--accent);}
+.badge-neutral{background:var(--surface2);color:var(--text2);}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:6px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;padding:9px 18px;border-radius:var(--radius);cursor:pointer;transition:all 0.15s;border:none;}
+.btn-primary{background:var(--accent);color:#fff;}.btn-primary:hover{background:var(--accent2);}
+.btn-outline{background:transparent;color:var(--text);border:1px solid var(--border2);}.btn-outline:hover{background:var(--surface2);}
+.btn-success{background:var(--green-bg);color:var(--green);border:1px solid #b3d9bf;}.btn-success:hover{background:#d0ecd9;}
+.btn-icon{width:16px;height:16px;}
+
+/* FORMS */
+.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;}
+.form-group{display:flex;flex-direction:column;gap:5px;}
+.form-group label{font-size:12px;font-weight:500;color:var(--accent);}
+.form-group input,.form-group select,.form-group textarea{font-family:'DM Sans',sans-serif;font-size:13px;padding:9px 12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);color:var(--text);outline:none;transition:border 0.15s;}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(109,40,217,0.08);}
+.form-group textarea{min-height:90px;resize:vertical;}
+.form-group .hint{font-size:11px;color:var(--text3);}
+.form-section{margin-bottom:22px;}
+.form-section-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--accent);margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid var(--accent-light);}
+
+/* UPLOAD */
+.upload-zone{border:2px dashed var(--border2);border-radius:var(--radius-lg);padding:32px;text-align:center;cursor:pointer;transition:all 0.2s;background:var(--surface);}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--accent);background:var(--accent-light);}
+.upload-zone svg{width:32px;height:32px;color:var(--accent3);margin-bottom:10px;}
+.upload-zone p{font-size:14px;color:var(--text2);margin-bottom:4px;}
+.upload-zone span{font-size:12px;color:var(--text3);}
+.upload-zone input[type=file]{display:none;}
+
+/* DIVIDER */
+.divider{height:1px;background:var(--border);margin:20px 0;}
+.divider-purple{height:2px;background:linear-gradient(90deg,var(--accent),var(--lilac),transparent);margin:20px 0;border-radius:2px;}
+
+/* ALERT */
+.alert{display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border-radius:var(--radius);font-size:13px;margin-bottom:16px;}
+.alert-info{background:var(--accent-light);color:var(--accent);border:1px solid var(--border2);}
+.alert-success{background:var(--green-bg);color:var(--green);border:1px solid #b3d9bf;}
+
+/* REPORT — full purple theme */
+.report-block{margin-bottom:22px;}
+.report-block h3{font-family:'DM Serif Display',serif;font-size:19px;font-weight:400;color:var(--accent);margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+.report-block h3::before{content:'';display:inline-block;width:4px;height:20px;background:linear-gradient(180deg,var(--accent),var(--lilac));border-radius:2px;flex-shrink:0;}
+.report-text{font-size:14px;color:var(--text2);line-height:1.75;background:var(--surface2);padding:14px 16px;border-radius:var(--radius);border-left:3px solid var(--accent-mid);}
+.rel-metric{background:var(--accent-light);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px 18px;}
+.rel-metric .m-label{font-size:11px;color:var(--accent2);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:7px;opacity:0.85;}
+.rel-metric .m-value{font-size:18px;font-weight:600;color:var(--accent);line-height:1;}
+.rel-metric .m-delta{font-size:12px;margin-top:5px;}
+.rel-chip{display:inline-flex;font-size:12px;background:var(--surface);color:var(--accent2);padding:4px 10px;border-radius:6px;border:1px solid var(--border2);margin:3px;}
+.rel-section-head{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--accent);margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid var(--accent-light);}
+.rel-auto-tag{display:inline-flex;font-size:11px;background:var(--accent);color:#fff;padding:2px 9px;border-radius:20px;font-weight:500;margin-left:8px;vertical-align:middle;}
+
+/* TOAST */
+#toast{position:fixed;bottom:24px;right:24px;background:var(--accent);color:#fff;padding:12px 20px;border-radius:var(--radius);font-size:13px;font-weight:500;opacity:0;transform:translateY(8px);transition:all 0.2s;pointer-events:none;z-index:999;}
+#toast.show{opacity:1;transform:translateY(0);}
+
+/* TAGS */
+.auto-tag{display:inline-flex;font-size:11px;background:var(--accent-light);color:var(--accent2);padding:2px 8px;border-radius:20px;font-weight:500;border:1px solid var(--border);}
+.section-tag{font-size:11px;background:var(--accent-light);color:var(--accent2);padding:2px 10px;border-radius:20px;font-weight:500;vertical-align:middle;margin-left:8px;}
+
+/* BONUS / ANALYST CARDS */
+.analyst-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px 18px;transition:box-shadow 0.15s;}
+.analyst-card:hover{box-shadow:var(--shadow);}
+.analyst-header{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
+.analyst-avatar{width:38px;height:38px;border-radius:50%;background:var(--accent-light);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:var(--accent);flex-shrink:0;}
+.analyst-name{font-size:14px;font-weight:600;color:var(--text);}
+.analyst-role{font-size:11px;color:var(--text3);}
+.analyst-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px;}
+.analyst-stat{background:var(--surface2);border-radius:8px;padding:8px 10px;text-align:center;}
+.analyst-stat .as-val{font-size:18px;font-weight:600;color:var(--accent);}
+.analyst-stat .as-label{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em;margin-top:2px;}
+.month-timeline{display:flex;gap:4px;flex-wrap:wrap;margin-top:8px;}
+.mt-chip{font-size:11px;padding:3px 8px;border-radius:6px;border:1px solid var(--border);color:var(--text2);background:var(--surface);}
+.mt-chip.score-5{background:#E6F4EC;color:#1A6B3A;border-color:#b3d9bf;}
+.mt-chip.score-4{background:var(--accent-light);color:var(--accent);border-color:var(--border2);}
+.mt-chip.score-3{background:#FEF4E0;color:#8B5E0A;border-color:#e8d08a;}
+.mt-chip.score-2{background:#FAEAE8;color:#C0392B;border-color:#f0b3ad;}
+.mt-chip.score-1{background:#f8e0de;color:#8B0000;border-color:#e8a09a;}
+.analysts-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-bottom:20px;}
+.period-tabs{display:flex;gap:4px;background:var(--surface2);padding:4px;border-radius:var(--radius);width:fit-content;}
+.period-tab{font-size:13px;padding:6px 14px;border-radius:7px;cursor:pointer;color:var(--text2);border:none;background:transparent;font-family:'DM Sans',sans-serif;transition:all 0.15s;}
+.period-tab.active{background:var(--accent);color:#fff;font-weight:500;}
+.bonus-row-won{background:var(--accent-light)!important;}
+.bonus-row-won td{color:var(--accent)!important;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+
+@media(max-width:900px){.layout{grid-template-columns:1fr;}.sidebar{display:none;}.main{padding:20px 16px;}.grid-4{grid-template-columns:repeat(2,1fr);}}
+</style>
+</head>
+<body>
+<div id="toast"></div>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="title">Painel B2C</div>
+      <div class="sub">Gestão mensal do time</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Análise</div>
+      <button class="nav-item active" onclick="goTo('overview',this)">
+        <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+        Visão geral
+      </button>
+      <button class="nav-item" onclick="goTo('comparativo',this)">
+        <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+        Comparativo trimestral
+      </button>
+      <button class="nav-item" onclick="goTo('relatorio',this)">
+        <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        Relatório mensal
+      </button>
+      <button class="nav-item" onclick="goTo('bonificacao',this)">
+        <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        Bonificação do time
+      </button>
+      <div class="nav-section">Dados</div>
+      <button class="nav-item" onclick="goTo('lancar',this)">
+        <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+        Lançar novo mês
+      </button>
+      <button class="nav-item" onclick="goTo('importar',this)">
+        <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"/></svg>
+        Importar planilha
+      </button>
+      <button class="nav-item" onclick="exportCSV()">
+        <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        Exportar CSV
+      </button>
+      <button class="nav-item" onclick="goTo('config',this)">
+        <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        Configurar nuvem
+      </button>
+    </nav>
+    <div class="sidebar-footer">
+      <div id="sync-status" style="font-size:11px;color:rgba(255,255,255,0.4);margin-bottom:6px"></div>
+      <div class="version">v3.2 · 2026</div>
+    </div>
+  </aside>
+
+  <main class="main">
+
+    <!-- VISÃO GERAL -->
+    <div class="page active" id="page-overview">
+      <div class="page-header"><h1>Visão geral</h1><p>Indicadores consolidados do mês selecionado</p></div>
+      <div class="month-bar"><label>Mês de referência:</label><select id="sel-overview" onchange="renderOverview()"></select></div>
+      <div class="grid-4" id="kpis-top"></div>
+      <div class="grid-2">
+        <div class="card"><div class="card-title">Reclame Aqui</div><div class="chart-container" style="height:220px"><canvas id="ch-ra"></canvas></div></div>
+        <div class="card">
+          <div class="card-title">Tickets — respondidos vs automação</div>
+          <div id="tickets-overview-info" style="margin-bottom:10px"></div>
+          <div class="chart-container" style="height:180px"><canvas id="ch-tickets"></canvas></div>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card"><div class="card-title">Mídias Sociais — comentários + DMs</div><div class="chart-container" style="height:200px"><canvas id="ch-midias"></canvas></div></div>
+        <div class="card"><div class="card-title">SLA — evolução 6 meses (horas)</div><div class="chart-container" style="height:200px"><canvas id="ch-sla"></canvas></div></div>
+      </div>
+      <div class="grid-4" id="kpis-ra"></div>
+    </div>
+
+    <!-- COMPARATIVO -->
+    <div class="page" id="page-comparativo">
+      <div class="page-header"><h1>Comparativo trimestral</h1><p>Últimos 3 meses lado a lado com variação percentual</p></div>
+      <div class="month-bar">
+        <label>Mês mais recente:</label>
+        <select id="sel-comp" onchange="renderComparativo()"></select>
+        <button class="btn btn-success" onclick="exportComparativoCSV()">
+          <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+          Exportar comparativo
+        </button>
+      </div>
+      <div class="card"><div class="table-wrap" id="comp-table"></div></div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-bottom:16px">
+        <div class="card" style="margin-bottom:0"><div class="card-title">Custo área (R$)</div><div class="chart-container" style="height:200px"><canvas id="ch-c-custo"></canvas></div></div>
+        <div class="card" style="margin-bottom:0"><div class="card-title">Estornos — valor total (R$)</div><div class="chart-container" style="height:200px"><canvas id="ch-c-estval"></canvas></div></div>
+        <div class="card" style="margin-bottom:0"><div class="card-title">Qtd reclamações (RA)</div><div class="chart-container" style="height:200px"><canvas id="ch-c-raqtd"></canvas></div></div>
+        <div class="card" style="margin-bottom:0"><div class="card-title">Moderações</div><div class="chart-container" style="height:200px"><canvas id="ch-c-mod"></canvas></div></div>
+        <div class="card" style="margin-bottom:0"><div class="card-title">Índice de solução (%)</div><div class="chart-container" style="height:200px"><canvas id="ch-c-sol"></canvas></div></div>
+        <div class="card" style="margin-bottom:0"><div class="card-title">Índice novos negócios (%)</div><div class="chart-container" style="height:200px"><canvas id="ch-c-neg"></canvas></div></div>
+        <div class="card" style="margin-bottom:0"><div class="card-title">Disparos por automação</div><div class="chart-container" style="height:200px"><canvas id="ch-c-disp"></canvas></div></div>
+      </div>
+    </div>
+
+    <!-- RELATÓRIO -->
+    <div class="page" id="page-relatorio">
+      <div class="page-header"><h1>Relatório mensal</h1><p>Documento gerado automaticamente com todos os indicadores</p></div>
+      <div class="month-bar">
+        <label>Mês:</label>
+        <select id="sel-rel" onchange="renderRelatorio()"></select>
+        <button class="btn btn-primary" onclick="window.print()">
+          <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+          Imprimir / PDF
+        </button>
+        <button class="btn btn-success" onclick="exportRelatorioCSV()">
+          <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+          Exportar CSV
+        </button>
+      </div>
+      <div id="relatorio-body"></div>
+    </div>
+
+    <!-- BONIFICAÇÃO -->
+    <div class="page" id="page-bonificacao">
+      <div class="page-header"><h1>Bonificação do time</h1><p>Score, frequência de bônus e comparativo por período</p></div>
+      <div class="month-bar">
+        <div class="period-tabs">
+          <button class="period-tab active" onclick="setBonusPeriod('trimestre',this)">Trimestre</button>
+          <button class="period-tab" onclick="setBonusPeriod('ano',this)">Ano 2026</button>
+          <button class="period-tab" onclick="setBonusPeriod('todos',this)">Todos</button>
+        </div>
+        <button class="btn btn-success" onclick="exportBonusCSV()">
+          <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+          Exportar
+        </button>
+      </div>
+      <div class="grid-4" id="bonus-kpis" style="margin-bottom:20px"></div>
+      <h2 style="font-family:'DM Serif Display',serif;font-size:20px;font-weight:400;color:var(--accent);margin-bottom:14px">Desempenho por analista</h2>
+      <div class="analysts-grid" id="analysts-grid"></div>
+      <div class="card"><div class="card-title">Histórico detalhado</div><div class="table-wrap" id="bonus-table"></div></div>
+      <div class="grid-2">
+        <div class="card"><div class="card-title">Score médio por analista</div><div class="chart-container" style="height:250px"><canvas id="ch-bonus-score"></canvas></div></div>
+        <div class="card"><div class="card-title">Vezes que ganhou bônus (score ≥ 4)</div><div class="chart-container" style="height:250px"><canvas id="ch-bonus-count"></canvas></div></div>
+      </div>
+    </div>
+
+    <!-- LANÇAR -->
+    <div class="page" id="page-lancar">
+      <div class="page-header"><h1>Lançar novo mês</h1><p>Preencha os indicadores do período e salve</p></div>
+      <div class="card">
+        <div class="form-section">
+          <div class="form-section-title">Identificação</div>
+          <div class="form-grid" style="grid-template-columns:repeat(3,1fr)">
+            <div class="form-group"><label>Mês</label><select id="f-mes"><option>Janeiro</option><option>Fevereiro</option><option>Março</option><option>Abril</option><option>Maio</option><option>Junho</option><option>Julho</option><option>Agosto</option><option>Setembro</option><option>Outubro</option><option>Novembro</option><option>Dezembro</option></select></div>
+            <div class="form-group"><label>Ano</label><input type="number" id="f-ano" value="2026"></div>
+            <div class="form-group"><label>Colaboradores</label><input type="number" id="f-colab"></div>
+          </div>
+        </div>
+        <div class="form-section">
+          <div class="form-section-title">Financeiro</div>
+          <div class="form-grid">
+            <div class="form-group"><label>Custo área (R$)</label><input type="text" id="f-custo"></div>
+            <div class="form-group"><label>ROL Appmax (R$)</label><input type="text" id="f-rol"></div>
+            <div class="form-group"><label>% sobre ROL</label><input type="text" id="f-pct"></div>
+          </div>
+        </div>
+        <div class="form-section">
+          <div class="form-section-title">Estornos</div>
+          <div class="form-grid">
+            <div class="form-group"><label>Valor total realizado (R$)</label><input type="text" id="f-est-val"></div>
+            <div class="form-group"><label>Quantidade realizada</label><input type="number" id="f-est-qtd"></div>
+            <div class="form-group"><label>Pix (R$)</label><input type="text" id="f-est-pix"></div>
+            <div class="form-group"><label>Boleto (R$)</label><input type="text" id="f-est-boleto"></div>
+            <div class="form-group"><label>Cartão (R$)</label><input type="text" id="f-est-cartao"></div>
+          </div>
+        </div>
+        <div class="form-section">
+          <div class="form-section-title">Reclame Aqui</div>
+          <div class="form-grid">
+            <div class="form-group"><label>Qtd reclamações</label><input type="number" id="f-ra-qtd"></div>
+            <div class="form-group"><label>Nota</label><input type="text" id="f-ra-nota"></div>
+            <div class="form-group"><label>Reputação</label><input type="text" id="f-ra-rep" placeholder="RA1000 / Ótimo / Bom"></div>
+            <div class="form-group"><label>Índice solução (%)</label><input type="text" id="f-ra-sol"></div>
+            <div class="form-group"><label>Índice novos negócios (%)</label><input type="text" id="f-ra-neg"></div>
+            <div class="form-group"><label>Avaliações positivas</label><input type="number" id="f-ra-pos"></div>
+            <div class="form-group"><label>Avaliações negativas</label><input type="number" id="f-ra-neg2"></div>
+            <div class="form-group"><label>Moderações</label><input type="number" id="f-ra-mod"></div>
+          </div>
+        </div>
+        <div class="form-section">
+          <div class="form-section-title">Tickets <span class="section-tag">automação a partir de abr/2026</span></div>
+          <div class="alert alert-info" style="margin-bottom:12px">
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="flex-shrink:0;margin-top:1px"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            A partir de abril/2026 os tickets são 100% automatizados via formulário.
+          </div>
+          <div class="form-grid">
+            <div class="form-group"><label>Tickets respondidos</label><input type="number" id="f-tk-total"><span class="hint">Total de tickets atendidos</span></div>
+            <div class="form-group"><label>Disparos por automação <span class="auto-tag">novo</span></label><input type="number" id="f-disparos"><span class="hint">Disparos pelo formulário automático</span></div>
+            <div class="form-group"><label>SLA ticket (hh:mm)</label><input type="text" id="f-sla-tk" placeholder="02:00"></div>
+          </div>
+        </div>
+        <div class="form-section">
+          <div class="form-section-title">Mídias Sociais</div>
+          <div class="form-grid">
+            <div class="form-group"><label>Instagram — comentários</label><input type="number" id="f-ig-com"></div>
+            <div class="form-group"><label>Instagram — mensagens (DM)</label><input type="number" id="f-ig"></div>
+            <div class="form-group"><label>Facebook — comentários</label><input type="number" id="f-fb-com"></div>
+            <div class="form-group"><label>Facebook — Messenger</label><input type="number" id="f-fb"></div>
+            <div class="form-group"><label>SLA comentário (hh:mm)</label><input type="text" id="f-sla-com" placeholder="03:23"></div>
+            <div class="form-group"><label>SLA 1ª resposta</label><input type="text" id="f-sla-1r" placeholder="03:14"></div>
+            <div class="form-group"><label>Usuários mídias</label><input type="number" id="f-usuarios"></div>
+          </div>
+        </div>
+        <div class="form-section">
+          <div class="form-section-title">Relatório — textos</div>
+          <div class="form-grid" style="grid-template-columns:1fr 1fr">
+            <div class="form-group"><label>Ações realizadas no mês</label><textarea id="f-acoes" placeholder="Descreva as principais ações..."></textarea></div>
+            <div class="form-group"><label>Melhorias implementadas</label><textarea id="f-melhorias" placeholder="Melhorias nos processos, ferramentas..."></textarea></div>
+          </div>
+          <div class="form-grid" style="grid-template-columns:1fr 1fr;margin-top:14px">
+            <div class="form-group"><label>Sugestões de melhoria</label><textarea id="f-sugestoes" placeholder="Sugestões do time..."></textarea></div>
+            <div class="form-group"><label>Planejamentos próximo mês</label><textarea id="f-planejamentos" placeholder="O que a equipe planeja fazer..."></textarea></div>
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <button class="btn btn-primary" onclick="salvarMes()">Salvar mês</button>
+          <button class="btn btn-outline" onclick="limparForm()">Limpar</button>
+          <span id="save-msg" style="font-size:13px;color:var(--green);font-weight:500"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- IMPORTAR -->
+    <div class="page" id="page-importar">
+      <div class="page-header"><h1>Importar planilha</h1><p>Upload do CSV para atualizar os dados</p></div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">Dados mensais B2C</div>
+          <div class="upload-zone" id="upload-zone1" onclick="document.getElementById('fi1').click()" ondragover="dragOver(event,'upload-zone1')" ondragleave="dragLeave('upload-zone1')" ondrop="dropFile(event,'ind')">
+            <input type="file" id="fi1" accept=".csv" onchange="handleIndicadoresFile(this.files[0])">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v8"/></svg>
+            <p>Dados_mensais_B2C_Resumo.csv</p><span>Clique ou arraste</span>
+          </div>
+          <div id="import-log1" style="margin-top:10px;font-size:13px;color:var(--text2)"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Calculadora de bonificação</div>
+          <div class="upload-zone" id="upload-zone2" onclick="document.getElementById('fi2').click()" ondragover="dragOver(event,'upload-zone2')" ondragleave="dragLeave('upload-zone2')" ondrop="dropFile(event,'bonus')">
+            <input type="file" id="fi2" accept=".csv" onchange="handleBonusFile(this.files[0])">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v8"/></svg>
+            <p>Calculadora_B2C_Resumo.csv</p><span>Clique ou arraste</span>
+          </div>
+          <div id="import-log2" style="margin-top:10px;font-size:13px;color:var(--text2)"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Exportar dados</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-success" onclick="exportCSV()">
+            <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+            Indicadores mensais (CSV)
+          </button>
+          <button class="btn btn-success" onclick="exportBonusCSV()">
+            <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+            Bonificação do time (CSV)
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PUBLICAR -->
+    <div class="page" id="page-config">
+      <div class="page-header"><h1>Publicar na nuvem</h1><p>Compartilhe o painel com sua liderança e time via link</p></div>
+
+      <div class="card" style="border-color:var(--border2)">
+        <div class="card-title">Como funciona</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px">
+          <div style="background:var(--surface2);border-radius:var(--radius);padding:14px 16px">
+            <div style="font-size:24px;margin-bottom:8px">📥</div>
+            <div style="font-size:13px;font-weight:600;color:var(--accent);margin-bottom:4px">1. Lance os dados</div>
+            <div style="font-size:12px;color:var(--text2)">Preencha os indicadores do mês em "Lançar novo mês" e salve normalmente.</div>
+          </div>
+          <div style="background:var(--surface2);border-radius:var(--radius);padding:14px 16px">
+            <div style="font-size:24px;margin-bottom:8px">📦</div>
+            <div style="font-size:13px;font-weight:600;color:var(--accent);margin-bottom:4px">2. Gere o arquivo</div>
+            <div style="font-size:12px;color:var(--text2)">Clique em "Gerar HTML para publicar". O arquivo gerado tem todos os dados embutidos.</div>
+          </div>
+          <div style="background:var(--surface2);border-radius:var(--radius);padding:14px 16px">
+            <div style="font-size:24px;margin-bottom:8px">🌐</div>
+            <div style="font-size:13px;font-weight:600;color:var(--accent);margin-bottom:4px">3. Suba no Netlify</div>
+            <div style="font-size:12px;color:var(--text2)">Acesse <a href="https://netlify.com/drop" target="_blank" style="color:var(--accent);font-weight:600">netlify.com/drop</a>, arraste o arquivo e copie o link.</div>
+          </div>
+          <div style="background:var(--surface2);border-radius:var(--radius);padding:14px 16px">
+            <div style="font-size:24px;margin-bottom:8px">🔗</div>
+            <div style="font-size:13px;font-weight:600;color:var(--accent);margin-bottom:4px">4. Compartilhe</div>
+            <div style="font-size:12px;color:var(--text2)">Envie o link para liderança e time. Para atualizar: repita os passos 1–3.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Gerar arquivo para publicar</div>
+        <p style="font-size:13px;color:var(--text2);margin-bottom:8px">O arquivo gerado contém todos os dados atuais embutidos. Qualquer pessoa que abrir o link verá o painel completo — <strong style="color:var(--accent)">sem precisar de login ou conta.</strong></p>
+        <div class="alert alert-info" style="margin-bottom:16px">
+          <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="flex-shrink:0;margin-top:1px"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          O arquivo publicado é <strong>somente leitura</strong> — sua equipe vê tudo mas não consegue editar. Quando lançar um novo mês, gere e publique um novo arquivo.
+        </div>
+        <button class="btn btn-primary" onclick="gerarEPublicar()" style="font-size:14px;padding:12px 28px">
+          <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+          Gerar HTML para publicar
+        </button>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Passo a passo — Netlify Drop</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+          <div>
+            <ol style="font-size:13px;color:var(--text2);line-height:2.6;padding-left:18px">
+              <li>Clique em <strong style="color:var(--accent)">"Gerar HTML para publicar"</strong> acima — vai abrir uma nova aba no navegador</li>
+              <li>Na nova aba, pressione <strong style="color:var(--accent)">Ctrl+S</strong> (Windows) ou <strong style="color:var(--accent)">Cmd+S</strong> (Mac)</li>
+              <li>Na janela que abrir, <strong style="color:var(--accent)">mude o nome para</strong> <code style="background:var(--surface2);padding:1px 6px;border-radius:4px;font-size:12px">index.html</code> e salve</li>
+              <li>No seu computador, <strong style="color:var(--accent)">crie uma pasta nova</strong> (ex: "painel-b2c") e mova o <code style="background:var(--surface2);padding:1px 6px;border-radius:4px;font-size:12px">index.html</code> para dentro</li>
+              <li>Acesse <a href="https://netlify.com/drop" target="_blank" style="color:var(--accent);font-weight:600">netlify.com/drop</a> no navegador</li>
+              <li><strong style="color:var(--accent)">Arraste a pasta inteira</strong> para a área cinza da página</li>
+              <li>Copie o link e envie para sua equipe!</li>
+            </ol>
+          </div>
+          <div>
+            <div style="background:#FEF4E0;border:1px solid #e8d08a;border-radius:var(--radius);padding:14px;margin-bottom:12px">
+              <div style="font-size:12px;font-weight:600;color:#8B5E0A;margin-bottom:6px">⚠️ Por que arrastar a pasta e não o arquivo?</div>
+              <div style="font-size:12px;color:#8B5E0A;line-height:1.8">O Netlify precisa de uma <strong>pasta</strong> contendo o arquivo <code style="background:rgba(0,0,0,0.06);padding:1px 5px;border-radius:3px">index.html</code>. Se arrastar só o arquivo, a navegação entre as abas do painel não funciona.</div>
+            </div>
+            <div style="background:var(--surface2);border-radius:var(--radius);padding:14px">
+              <div style="font-size:12px;font-weight:600;color:var(--accent);margin-bottom:8px">🔄 Para atualizar depois</div>
+              <ul style="font-size:12px;color:var(--text2);line-height:2.2;padding-left:16px">
+                <li>Gere um novo <code style="background:var(--surface);padding:1px 5px;border-radius:3px">index.html</code> aqui</li>
+                <li>Coloque em uma pasta</li>
+                <li>No Netlify, vá em <strong>Deploys</strong> e arraste a nova pasta</li>
+                <li>O mesmo link continua funcionando</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+const MONTH_LABELS=['Abr/25','Mai/25','Jun/25','Jul/25','Ago/25','Set/25','Out/25','Nov/25','Dez/25','Jan/26','Fev/26','Mar/26'];
+const MONTH_FULL=['Abril/2025','Maio/2025','Junho/2025','Julho/2025','Agosto/2025','Setembro/2025','Outubro/2025','Novembro/2025','Dezembro/2025','Janeiro/2026','Fevereiro/2026','Março/2026'];
+
+let DB={
+  custo:     [57824.85,55716,47828,65671,58551.38,39389.25,47599.57,49314.40,45212.55,37393.11,40502.36,null],
+  colaboradores:[14,13,13,13,10,10,9,8,8,7,7,7],
+  rol:       [null,null,null,null,null,9623636.58,9597242.83,13455150.11,10426718.21,10355766.31,10349057.85,26975153.95],
+  pctRol:    [null,null,null,null,null,0.41,0.50,0.37,0.43,0.36,0.39,null],
+  estQtd:    [null,812,863,417,99,113,177,175,196,227,151,146],
+  estVal:    [null,192639.18,255117.50,114844.29,50570.60,35895.96,42526.65,39005.73,37683.87,43369.03,25385.90,26595.29],
+  estPix:    [null,34328.90,59216.81,40765.39,35504.54,26966.73,29418.11,26092.88,25641.04,27360.39,15968.80,19013.90],
+  estBoleto: [null,6151.07,11885.75,575.80,397.90,229.90,535.30,540.40,1182.45,578.02,465.17,209.80],
+  estCartao: [null,152159.21,184014.94,73503.10,14668.16,8669.33,12573.24,12372.45,10860.38,15430.62,8951.96,7371.59],
+  estPix:    [null,34328.90,59216.81,40765.39,35504.54,26966.73,29418.11,26092.88,25641.04,27360.39,15968.80,19013.90],
+  estBoleto: [null,6151.07,11885.75,575.80,397.90,229.90,535.30,540.40,1182.45,578.02,465.17,209.80],
+  estCartao: [null,152159.21,184014.94,73503.10,14668.16,8669.33,12573.24,12372.45,10860.38,15430.62,8951.96,7371.59],
+  cbkQtd:    [1312,1470,1217,1144,732,763,537,261,453,347,201,186],
+  cbkVal:    [643426.63,754771.61,331648.52,1052481.07,321538.84,189431.85,167639.75,62826.46,103735.27,225191.17,114467.61,98654.52],
+  raQtd:     [321,237,169,144,117,159,188,181,166,273,178,149],
+  raMod:     [856,768,837,736,662,661,661,455,533,694,517,617],
+  raNota:    [6.27,6.7,7.4,7.22,7.57,7.44,7.52,8.29,8.15,8.67,8.5,8.6],
+  raPos:     [164,121,77,63,63,84,103,117,93,171,106,75],
+  raNeg:     [35,24,19,14,11,19,20,11,13,13,16,8],
+  raSol:     [82.4,83.4,80.2,81.8,85.1,81.6,84,91.4,88.2,92.9,86.9,90.4],
+  raNovNeg:  [56.8,60.7,52.1,67.7,74.3,69.9,66.1,80.8,80,85.3,73.6,80.7],
+  raRep:     ['Bom','Bom','Bom','Ótimo','Ótimo','Ótimo','Ótimo','RA1000','Ótimo','RA1000','Ótimo','RA1000'],
+  usuarios:  [705,699,566,672,579,651,698,630,721,830,858,775],
+  igCom:     [732,1424,720,662,613,465,417,517,403,4772,3488,732],
+  igTk:      [472,527,380,514,778,426,441,352,408,421,350,366],
+  fbCom:     [139,264,58,141,136,163,168,138,337,210,148,149],
+  fbTk:      [109,94,96,149,206,152,186,180,229,313,286,270],
+  tkTotal:   [13888,17834,18750,28593,28716,22225,11475,10820,15746,13871,9510,11639],
+  preTk:     [2562,4613,3526,5277,7804,8970,2927,2614,4456,1858,3001,4001],
+  backlog:   [null,null,null,10711,9400,254,26,12,5,7,54,10],
+  disparos:  [null,null,null,null,null,null,null,null,null,null,null,null],
+  slaTicket: ['05:19','05:27','07:17','05:35','03:12','02:44','01:55','01:47','02:19','02:00','05:07','03:40'],
+  sla1r:     ['07:11','05:05','05:08','04:38','02:37','03:51','01:50','02:21','02:45','03:30','04:32','03:14'],
+  slaCom:    ['05:04','05:22','06:44','05:04','03:13','02:36','01:50','01:44','02:16','02:01','04:32','03:23'],
+  acoes:     Array(12).fill(''),
+  melhorias: Array(12).fill(''),
+  sugestoes: Array(12).fill(''),
+  planejamentos: Array(12).fill('')
+};
+
+const BONUS_BY_SCORE={4:100,5:150};
+let BONUS_DATA=[
+  {analista:'Giovanna',area:'Ticket',nivel:'Júnior I',mes:'Dezembro',ano:2025,score:3,avaliacao:'Dentro do esperado - Constante'},
+  {analista:'Giovanna',area:'Ticket',nivel:'Júnior I',mes:'Janeiro',ano:2026,score:4,avaliacao:'Dentro do esperado - Em ascensão'},
+  {analista:'Giovanna',area:'Ticket',nivel:'Júnior I',mes:'Fevereiro',ano:2026,score:3,avaliacao:'Dentro do esperado - Constante'},
+  {analista:'Giovanna',area:'Ticket',nivel:'Júnior I',mes:'Março',ano:2026,score:4,avaliacao:'Dentro do esperado - Em ascensão'},
+  {analista:'Ana Raquel',area:'Mídias Sociais',nivel:'Pleno I',mes:'Novembro',ano:2025,score:3,avaliacao:'Dentro do esperado - Constante'},
+  {analista:'Ana Raquel',area:'Mídias Sociais',nivel:'Pleno I',mes:'Dezembro',ano:2025,score:2,avaliacao:'Atenção - Estacionado'},
+  {analista:'Ana Raquel',area:'Mídias Sociais',nivel:'Pleno I',mes:'Janeiro',ano:2026,score:4,avaliacao:'Dentro do esperado - Em ascensão'},
+  {analista:'Ana Raquel',area:'Mídias Sociais',nivel:'Pleno I',mes:'Fevereiro',ano:2026,score:3,avaliacao:'Dentro do esperado - Constante'},
+  {analista:'Ana Raquel',area:'Mídias Sociais',nivel:'Pleno I',mes:'Março',ano:2026,score:4,avaliacao:'Dentro do esperado - Em ascensão'},
+  {analista:'Karen',area:'Reclame Aqui',nivel:'Sênior I',mes:'Novembro',ano:2025,score:4,avaliacao:'Em ascensão'},
+  {analista:'Karen',area:'Reclame Aqui',nivel:'Sênior I',mes:'Dezembro',ano:2025,score:5,avaliacao:'Acima do esperado'},
+  {analista:'Karen',area:'Reclame Aqui',nivel:'Sênior I',mes:'Janeiro',ano:2026,score:4,avaliacao:'Dentro do esperado - Em ascensão'},
+  {analista:'Karen',area:'Reclame Aqui',nivel:'Sênior I',mes:'Fevereiro',ano:2026,score:4,avaliacao:'Dentro do esperado - Em ascensão'},
+  {analista:'Karen',area:'Reclame Aqui',nivel:'Sênior I',mes:'Março',ano:2026,score:3,avaliacao:'Dentro do esperado - Constante'},
+  {analista:'Sara',area:'Reclame Aqui',nivel:'Júnior I',mes:'Novembro',ano:2025,score:3,avaliacao:'Dentro do esperado - Constante'},
+  {analista:'Sara',area:'Reclame Aqui',nivel:'Júnior I',mes:'Dezembro',ano:2025,score:3,avaliacao:'Dentro do esperado - Constante'},
+  {analista:'Sara',area:'Reclame Aqui',nivel:'Júnior I',mes:'Janeiro',ano:2026,score:4,avaliacao:'Dentro do esperado - Em ascensão'},
+  {analista:'Sara',area:'Reclame Aqui',nivel:'Júnior I',mes:'Fevereiro',ano:2026,score:3,avaliacao:'Dentro do esperado - Constante'},
+  {analista:'Sara',area:'Reclame Aqui',nivel:'Sênior I',mes:'Março',ano:2026,score:4,avaliacao:'Dentro do esperado - Em ascensão'},
+];
+
+// ─── SALVAR LOCAL ────────────────────────────────────────────────────────────
+function saveDB(){try{localStorage.setItem('b2c_db_v3',JSON.stringify(DB));}catch(e){}}
+function saveBonusDB(){try{localStorage.setItem('b2c_bonus',JSON.stringify(BONUS_DATA));}catch(e){}}
+try{const s=localStorage.getItem('b2c_db_v3');if(s)DB=Object.assign(DB,JSON.parse(s));}catch(e){}
+try{const s=localStorage.getItem('b2c_bonus');if(s)BONUS_DATA=JSON.parse(s);}catch(e){}
+
+// HELPERS
+function fmtBRL(v){if(v===null||v===undefined)return'—';return'R$ '+Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function fmtNum(v){if(v===null||v===undefined)return'—';return Number(v).toLocaleString('pt-BR');}
+function fmtPct(v){if(v===null||v===undefined)return'—';return Number(v).toFixed(1)+'%';}
+function parseBRL(s){if(!s)return null;const r=parseFloat(s.replace(/[R$\s]/g,'').replace(/\./g,'').replace(',','.'));return isNaN(r)?null:r;}
+function slaToH(s){if(!s||s==='—')return null;const p=s.replace(/:\d\d$/,'').split(':');return parseFloat(p[0])+(parseFloat(p[1]||0)/60);}
+function calcDelta(a,b){if(a===null||b===null||a===undefined||b===undefined||a===0)return'—';return((b-a)/Math.abs(a)*100>0?'+':'')+((b-a)/Math.abs(a)*100).toFixed(1)+'%';}
+function dH(curr,prev,inv){if(curr===null||prev===null||prev===0)return'';const d=((curr-prev)/Math.abs(prev))*100;const up=d>=0;const good=inv?!up:up;return`<div class="m-delta ${good?'delta-up':'delta-down'}">${up?'▲':'▼'} ${Math.abs(d).toFixed(1)}%</div>`;}
+function repBadge(r){if(!r)return'—';if(r.includes('RA1000'))return`<span class="badge badge-green">RA1000</span>`;if(r.includes('timo'))return`<span class="badge badge-purple">Ótimo</span>`;return`<span class="badge badge-amber">${r}</span>`;}
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
+function initials(n){return n.split(' ').map(x=>x[0]).join('').substring(0,2).toUpperCase();}
+function scoreBadge(s){const m={5:'badge-green',4:'badge-purple',3:'badge-amber',2:'badge-red',1:'badge-red'};return`<span class="badge ${m[s]||'badge-neutral'}">${s}</span>`;}
+function scoreLabel(s){return{5:'Acima do esperado',4:'Em ascensão',3:'Constante',2:'Atenção',1:'Crítico'}[s]||'—';}
+
+// NAVIGATION
+function goTo(id,el){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  if(el)el.classList.add('active');
+  if(id==='overview')renderOverview();
+  if(id==='comparativo')renderComparativo();
+  if(id==='relatorio')renderRelatorio();
+  if(id==='bonificacao')renderBonificacao();
+}
+
+function populateSelects(){
+  ['sel-overview','sel-comp','sel-rel'].forEach(id=>{
+    const sel=document.getElementById(id);if(!sel)return;
+    sel.innerHTML='';
+    MONTH_LABELS.forEach((m,i)=>{const o=document.createElement('option');o.value=i;o.textContent=m;sel.appendChild(o);});
+    sel.value=MONTH_LABELS.length-1;
+  });
+}
+
+const CH={};
+function dc(id){if(CH[id]){CH[id].destroy();delete CH[id];}}
+
+// CHART COLORS (purple palette)
+const PC=['#6D28D9','#8B5CF6','#A78BFA','#C4B5FD','#4C1D95','#7C3AED'];
+
+// OVERVIEW
+function renderOverview(){
+  const idx=parseInt(document.getElementById('sel-overview').value);
+  const prev=idx>0?idx-1:null;
+
+  document.getElementById('kpis-top').innerHTML=[
+    {label:'Custo área',val:DB.custo[idx],p:prev!==null?DB.custo[prev]:null,fmt:'brl',inv:true},
+    {label:'ROL Appmax',val:DB.rol[idx],p:null,fmt:'brl',inv:false},
+    {label:'Colaboradores',val:DB.colaboradores[idx],p:prev!==null?DB.colaboradores[prev]:null,fmt:'num',inv:false},
+    {label:'Total tickets',val:DB.tkTotal[idx],p:prev!==null?DB.tkTotal[prev]:null,fmt:'num',inv:true},
+  ].map(k=>`<div class="metric-card"><div class="m-label">${k.label}</div><div class="m-value">${k.fmt==='brl'?fmtBRL(k.val):fmtNum(k.val)}</div>${k.p!==null?dH(k.val,k.p,k.inv):''}</div>`).join('');
+
+  document.getElementById('kpis-ra').innerHTML=[
+    {label:'Nota RA',val:DB.raNota[idx],p:prev!==null?DB.raNota[prev]:null,inv:false,fmt:'num'},
+    {label:'Índice solução',val:DB.raSol[idx],p:prev!==null?DB.raSol[prev]:null,inv:false,fmt:'pct'},
+    {label:'Novos negócios',val:DB.raNovNeg[idx],p:prev!==null?DB.raNovNeg[prev]:null,inv:false,fmt:'pct'},
+    {label:'Reputação',val:DB.raRep[idx],p:null,inv:false,fmt:'rep'},
+  ].map(k=>{const v=k.fmt==='rep'?repBadge(k.val):k.fmt==='pct'?fmtPct(k.val):fmtNum(k.val);return`<div class="metric-card"><div class="m-label">${k.label}</div><div class="m-value" style="font-size:17px">${v}</div>${k.p!==null?dH(k.val,k.p,k.inv):''}</div>`;}).join('');
+
+  // RA chart
+  dc('ch-ra');
+  CH['ch-ra']=new Chart(document.getElementById('ch-ra'),{type:'bar',data:{labels:['Av. Positivas','Av. Negativas','Qtd RA','Moderações'],datasets:[{data:[DB.raPos[idx],DB.raNeg[idx],DB.raQtd[idx],DB.raMod[idx]],backgroundColor:['#6D28D9','#C0392B','#8B5CF6','#C4B5FD'],borderRadius:5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{font:{size:11}}},x:{ticks:{font:{size:11},autoSkip:false}}}}});
+
+  // TICKETS chart — respondidos vs automação
+  dc('ch-tickets');
+  const isAuto=DB.disparos[idx]!==null&&DB.disparos[idx]>0;
+  const tkResp=DB.tkTotal[idx]||0;
+  const tkAuto=DB.disparos[idx]||0;
+  const infoEl=document.getElementById('tickets-overview-info');
+  if(isAuto){
+    infoEl.innerHTML=`<div style="display:flex;gap:8px;flex-wrap:wrap">
+      <span style="font-size:12px;background:var(--accent-light);color:var(--accent);padding:3px 10px;border-radius:6px;border:1px solid var(--border2)">Respondidos: ${fmtNum(tkResp)}</span>
+      <span style="font-size:12px;background:#4C1D95;color:#fff;padding:3px 10px;border-radius:6px">Automação: ${fmtNum(tkAuto)}</span>
+    </div>`;
+    CH['ch-tickets']=new Chart(document.getElementById('ch-tickets'),{type:'doughnut',data:{labels:['Tickets respondidos','Disparos automáticos'],datasets:[{data:[tkResp,tkAuto],backgroundColor:['#8B5CF6','#4C1D95']}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:11},boxWidth:10}}}}});
+  }else{
+    infoEl.innerHTML=`<span style="font-size:12px;background:var(--accent-light);color:var(--accent);padding:3px 10px;border-radius:6px;border:1px solid var(--border2)">Total respondidos: ${fmtNum(tkResp)}</span>`;
+    CH['ch-tickets']=new Chart(document.getElementById('ch-tickets'),{type:'bar',data:{labels:['Tickets respondidos'],datasets:[{data:[tkResp],backgroundColor:['#6D28D9'],borderRadius:8}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{font:{size:11}}}}}});
+  }
+
+  // MÍDIAS chart — comentários e mensagens por canal
+  dc('ch-midias');
+  CH['ch-midias']=new Chart(document.getElementById('ch-midias'),{
+    type:'bar',
+    data:{
+      labels:['IG Comentários','IG Mensagens','FB Comentários','FB Messenger'],
+      datasets:[{
+        data:[DB.igCom[idx]||0,DB.igTk[idx]||0,DB.fbCom[idx]||0,DB.fbTk[idx]||0],
+        backgroundColor:['#6D28D9','#8B5CF6','#A78BFA','#C4B5FD'],
+        borderRadius:5
+      }]
+    },
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{font:{size:11}}},x:{ticks:{font:{size:11},autoSkip:false}}}}
+  });
+
+  // SLA line
+  dc('ch-sla');
+  const range=Array.from({length:6},(_,i)=>Math.max(0,idx-5+i)).filter((v,i,a)=>a.indexOf(v)===i&&v<=idx);
+  CH['ch-sla']=new Chart(document.getElementById('ch-sla'),{type:'line',data:{labels:range.map(i=>MONTH_LABELS[i]),datasets:[
+    {label:'SLA ticket',data:range.map(i=>slaToH(DB.slaTicket[i])),borderColor:'#6D28D9',backgroundColor:'rgba(109,40,217,0.08)',tension:0.35,fill:true,pointRadius:4},
+    {label:'SLA comentário',data:range.map(i=>slaToH(DB.slaCom[i])),borderColor:'#A78BFA',backgroundColor:'rgba(167,139,250,0.08)',tension:0.35,fill:true,pointRadius:4,borderDash:[5,3]},
+    {label:'SLA 1ª resp.',data:range.map(i=>slaToH(DB.sla1r[i])),borderColor:'#C4B5FD',backgroundColor:'rgba(196,181,253,0.06)',tension:0.35,fill:false,pointRadius:4,borderDash:[2,2]}
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{font:{size:11},boxWidth:10}}},scales:{y:{beginAtZero:true,ticks:{callback:v=>v.toFixed(1)+'h',font:{size:11}}},x:{ticks:{font:{size:11}}}}}});
+}
+
+// COMPARATIVO
+function renderComparativo(){
+  const idx=parseInt(document.getElementById('sel-comp').value);
+  const idxs=[...new Set([Math.max(0,idx-2),Math.max(0,idx-1),idx])];
+  while(idxs.length<3)idxs.unshift(idxs[0]);
+  const labels=idxs.map(i=>MONTH_LABELS[i]);
+
+  const rows=[
+    {cat:'Financeiro',label:'Custo área',key:'custo',fmt:'brl',inv:true},
+    {cat:'Financeiro',label:'ROL Appmax',key:'rol',fmt:'brl',inv:false},
+    {cat:'Financeiro',label:'% sobre ROL',key:'pctRol',fmt:'pct',inv:true},
+    {cat:'Financeiro',label:'Colaboradores',key:'colaboradores',fmt:'num',inv:false},
+    {cat:'Estornos',label:'Estornos — qtd',key:'estQtd',fmt:'num',inv:true},
+    {cat:'Estornos',label:'Estornos — valor total',key:'estVal',fmt:'brl',inv:true},
+    {cat:'Estornos',label:'Estornos — Pix',key:'estPix',fmt:'brl',inv:true},
+    {cat:'Estornos',label:'Estornos — Boleto',key:'estBoleto',fmt:'brl',inv:true},
+    {cat:'Estornos',label:'Estornos — Cartão',key:'estCartao',fmt:'brl',inv:true},
+    {cat:'Reclame Aqui',label:'Qtd reclamações',key:'raQtd',fmt:'num',inv:true},
+    {cat:'Reclame Aqui',label:'Moderações',key:'raMod',fmt:'num',inv:false},
+    {cat:'Reclame Aqui',label:'Nota',key:'raNota',fmt:'num',inv:false},
+    {cat:'Reclame Aqui',label:'Avaliações positivas',key:'raPos',fmt:'num',inv:false},
+    {cat:'Reclame Aqui',label:'Avaliações negativas',key:'raNeg',fmt:'num',inv:true},
+    {cat:'Reclame Aqui',label:'Índice solução',key:'raSol',fmt:'pct',inv:false},
+    {cat:'Reclame Aqui',label:'Índice novos negócios',key:'raNovNeg',fmt:'pct',inv:false},
+    {cat:'Reclame Aqui',label:'Reputação',key:'raRep',fmt:'rep',inv:false},
+    {cat:'Mídias',label:'Usuários',key:'usuarios',fmt:'num',inv:false},
+    {cat:'Mídias',label:'IG comentários',key:'igCom',fmt:'num',inv:false},
+    {cat:'Mídias',label:'IG mensagens',key:'igTk',fmt:'num',inv:false},
+    {cat:'Mídias',label:'FB comentários',key:'fbCom',fmt:'num',inv:false},
+    {cat:'Mídias',label:'FB Messenger',key:'fbTk',fmt:'num',inv:false},
+    {cat:'Mídias',label:'SLA comentário',key:'slaCom',fmt:'str',inv:false},
+    {cat:'Mídias',label:'SLA 1ª resposta',key:'sla1r',fmt:'str',inv:false},
+    {cat:'Tickets',label:'Tickets respondidos',key:'tkTotal',fmt:'num',inv:true},
+    {cat:'Tickets',label:'Pré-tickets',key:'preTk',fmt:'num',inv:false},
+    {cat:'Tickets',label:'Média backlog',key:'backlog',fmt:'num',inv:true},
+    {cat:'Tickets',label:'Disparos automação',key:'disparos',fmt:'num',inv:false},
+    {cat:'Tickets',label:'SLA ticket',key:'slaTicket',fmt:'str',inv:false},
+  ];
+
+  let html=`<table><thead><tr><th>Categoria</th><th>Indicador</th>${labels.map(l=>`<th>${l}</th>`).join('')}<th>Variação</th></tr></thead><tbody>`;
+  rows.forEach(r=>{
+    const vals=idxs.map(i=>(DB[r.key]||[])[i]??null);
+    const v1=vals[1],v2=vals[2];
+    let badge='';
+    if(r.fmt!=='rep'&&v2!==null&&v1!==null&&v1!==0){const d=((v2-v1)/Math.abs(v1))*100;const good=r.inv?d<=0:d>=0;badge=`<span class="badge ${good?'badge-green':'badge-red'}">${d>0?'+':''}${d.toFixed(1)}%</span>`;}
+    const fV=v=>r.fmt==='brl'?fmtBRL(v):r.fmt==='pct'?fmtPct(v):r.fmt==='rep'?repBadge(v):r.fmt==='str'?(v||'—'):fmtNum(v);
+    html+=`<tr><td class="cat">${r.cat}</td><td>${r.label}</td>${vals.map(v=>`<td>${fV(v)}</td>`).join('')}<td>${badge}</td></tr>`;
+  });
+  document.getElementById('comp-table').innerHTML=html+'</tbody></table>';
+
+  // ── 7 gráficos individuais ──────────────────────────────────────────────
+  const barOpts=(yFmt)=>({
+    responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false}},
+    scales:{
+      y:{beginAtZero:false,ticks:{font:{size:11},callback:yFmt||((v)=>v)}},
+      x:{ticks:{font:{size:11}}}
+    }
+  });
+
+  const mkBar=(id,data,yFmt,colors)=>{
+    dc(id);
+    CH[id]=new Chart(document.getElementById(id),{
+      type:'bar',
+      data:{labels,datasets:[{
+        data,
+        backgroundColor:colors||['#C4B5FD','#8B5CF6','#6D28D9'],
+        borderRadius:6
+      }]},
+      options:barOpts(yFmt)
+    });
+  };
+
+  const mkLine=(id,data,yFmt)=>{
+    dc(id);
+    CH[id]=new Chart(document.getElementById(id),{
+      type:'line',
+      data:{labels,datasets:[{
+        data,
+        borderColor:'#6D28D9',
+        backgroundColor:'rgba(109,40,217,0.08)',
+        tension:0.35,fill:true,pointRadius:5,pointBackgroundColor:'#6D28D9'
+      }]},
+      options:{
+        responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:false}},
+        scales:{
+          y:{ticks:{font:{size:11},callback:yFmt||((v)=>v)}},
+          x:{ticks:{font:{size:11}}}
+        }
+      }
+    });
+  };
+
+  const fmtK=v=>v>=1000?'R$'+Math.round(v/1000)+'k':'R$'+Math.round(v);
+
+  mkBar('ch-c-custo',   idxs.map(i=>DB.custo[i]||0),   fmtK);
+  mkBar('ch-c-estval',  idxs.map(i=>DB.estVal[i]||0),  fmtK);
+  mkBar('ch-c-raqtd',   idxs.map(i=>DB.raQtd[i]||0),   null,['#C4B5FD','#8B5CF6','#6D28D9']);
+  mkBar('ch-c-mod',     idxs.map(i=>DB.raMod[i]||0),   null,['#C4B5FD','#8B5CF6','#6D28D9']);
+  mkLine('ch-c-sol',    idxs.map(i=>DB.raSol[i]||0),   v=>v+'%');
+  mkLine('ch-c-neg',    idxs.map(i=>DB.raNovNeg[i]||0),v=>v+'%');
+  mkBar('ch-c-disp',    idxs.map(i=>DB.disparos[i]||0),null,['#C4B5FD','#8B5CF6','#6D28D9']);
+}
+
+// RELATÓRIO
+function renderRelatorio(){
+  const idx=parseInt(document.getElementById('sel-rel').value);
+  const m=MONTH_FULL[idx]||MONTH_LABELS[idx];
+  const prev=idx>0?idx-1:null;
+  const isAuto=DB.disparos[idx]!==null&&DB.disparos[idx]>0;
+  const acao=DB.acoes[idx]||'<em style="color:var(--text3)">Nenhuma ação registrada.</em>';
+  const mel=DB.melhorias[idx]||'<em style="color:var(--text3)">Nenhuma melhoria registrada.</em>';
+  const sug=DB.sugestoes[idx]||'<em style="color:var(--text3)">Nenhuma sugestão registrada.</em>';
+  const plan=DB.planejamentos[idx]||'<em style="color:var(--text3)">Nenhum planejamento registrado.</em>';
+
+  const RM=(label,val,delta='')=>`<div class="rel-metric"><div class="m-label">${label}</div><div class="m-value">${val}</div>${delta}</div>`;
+  const RD=(c,p,inv)=>p!==null&&c!==null&&p!==0?`<div class="m-delta ${((c-p)/Math.abs(p))*(inv?-1:1)>=0?'delta-up':'delta-down'}">${c>=p?'▲':'▼'} ${Math.abs(((c-p)/Math.abs(p))*100).toFixed(1)}%</div>`:'';
+
+  const totalCom=(DB.igCom[idx]||0)+(DB.fbCom[idx]||0);
+  const totalDM=(DB.igTk[idx]||0)+(DB.fbTk[idx]||0);
+  const prevCom=prev!==null?((DB.igCom[prev]||0)+(DB.fbCom[prev]||0)):null;
+  const prevDM=prev!==null?((DB.igTk[prev]||0)+(DB.fbTk[prev]||0)):null;
+
+  document.getElementById('relatorio-body').innerHTML=`
+  <div class="card" style="border-color:var(--border2);background:linear-gradient(135deg,#faf9ff,#fff)">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:8px">
+      <h2 style="font-family:'DM Serif Display',serif;font-size:30px;font-weight:400;color:var(--accent)">${m}</h2>
+      <span style="font-size:13px;background:var(--accent);color:#fff;padding:5px 14px;border-radius:20px">${DB.colaboradores[idx]||'—'} colaboradores</span>
+    </div>
+    <div class="divider-purple"></div>
+
+    <div class="report-block">
+      <h3>Financeiro</h3>
+      <div class="grid-4" style="margin-bottom:0">
+        ${RM('Custo área',fmtBRL(DB.custo[idx]),RD(DB.custo[idx],prev!==null?DB.custo[prev]:null,true))}
+        ${RM('ROL Appmax',fmtBRL(DB.rol[idx]),RD(DB.rol[idx],prev!==null?DB.rol[prev]:null,false))}
+        ${RM('% sobre ROL',DB.pctRol[idx]!=null?DB.pctRol[idx]+'%':'—')}
+        ${RM('Colaboradores',fmtNum(DB.colaboradores[idx]),RD(DB.colaboradores[idx],prev!==null?DB.colaboradores[prev]:null,false))}
+      </div>
+    </div>
+
+    <div class="report-block">
+      <h3>Estornos</h3>
+      <div class="grid-4" style="margin-bottom:10px">
+        ${RM('Valor total realizado',fmtBRL(DB.estVal[idx]),RD(DB.estVal[idx],prev!==null?DB.estVal[prev]:null,true))}
+        ${RM('Quantidade realizada',fmtNum(DB.estQtd[idx]),RD(DB.estQtd[idx],prev!==null?DB.estQtd[prev]:null,true))}
+      </div>
+      <div class="grid-3" style="margin-bottom:0">
+        ${RM('Pix',fmtBRL(DB.estPix[idx]),RD(DB.estPix[idx],prev!==null?DB.estPix[prev]:null,true))}
+        ${RM('Boleto',fmtBRL(DB.estBoleto[idx]),RD(DB.estBoleto[idx],prev!==null?DB.estBoleto[prev]:null,true))}
+        ${RM('Cartão',fmtBRL(DB.estCartao[idx]),RD(DB.estCartao[idx],prev!==null?DB.estCartao[prev]:null,true))}
+      </div>
+    </div>
+
+    <div class="report-block">
+      <h3>Reclame Aqui</h3>
+      <div class="grid-4" style="margin-bottom:10px">
+        ${RM('Nota',fmtNum(DB.raNota[idx]),RD(DB.raNota[idx],prev!==null?DB.raNota[prev]:null,false))}
+        ${RM('Reputação',repBadge(DB.raRep[idx]))}
+        ${RM('Índice solução',fmtPct(DB.raSol[idx]),RD(DB.raSol[idx],prev!==null?DB.raSol[prev]:null,false))}
+        ${RM('Índice novos negócios',fmtPct(DB.raNovNeg[idx]),RD(DB.raNovNeg[idx],prev!==null?DB.raNovNeg[prev]:null,false))}
+      </div>
+      <div class="grid-4" style="margin-bottom:0">
+        ${RM('Qtd reclamações',fmtNum(DB.raQtd[idx]),RD(DB.raQtd[idx],prev!==null?DB.raQtd[prev]:null,true))}
+        ${RM('Moderações',fmtNum(DB.raMod[idx]),RD(DB.raMod[idx],prev!==null?DB.raMod[prev]:null,false))}
+        ${RM('Av. positivas',fmtNum(DB.raPos[idx]),RD(DB.raPos[idx],prev!==null?DB.raPos[prev]:null,false))}
+        ${RM('Av. negativas',fmtNum(DB.raNeg[idx]),RD(DB.raNeg[idx],prev!==null?DB.raNeg[prev]:null,true))}
+      </div>
+    </div>
+
+    <div class="report-block">
+      <h3>Tickets ${isAuto?'<span class="rel-auto-tag">100% automatizado</span>':''}</h3>
+      <div class="grid-4" style="margin-bottom:0">
+        ${RM('Tickets respondidos',fmtNum(DB.tkTotal[idx]),RD(DB.tkTotal[idx],prev!==null?DB.tkTotal[prev]:null,true))}
+        ${RM('Pré-tickets',fmtNum(DB.preTk[idx]),RD(DB.preTk[idx],prev!==null?DB.preTk[prev]:null,false))}
+        ${RM('Média backlog',fmtNum(DB.backlog[idx]),RD(DB.backlog[idx],prev!==null?DB.backlog[prev]:null,true))}
+        ${RM('Disparos automação',isAuto?fmtNum(DB.disparos[idx]):'—')}
+      </div>
+      <div style="margin-top:10px">
+        ${RM('SLA ticket',DB.slaTicket[idx]||'—')}
+      </div>
+    </div>
+
+    <div class="report-block">
+      <h3>Mídias Sociais</h3>
+      <div class="grid-4" style="margin-bottom:8px">
+        ${RM('Total comentários',fmtNum(totalCom),prevCom!==null?RD(totalCom,prevCom,false):'')}
+        ${RM('Total DMs + Messenger',fmtNum(totalDM),prevDM!==null?RD(totalDM,prevDM,false):'')}
+        ${RM('SLA comentário',DB.slaCom[idx]||'—')}
+        ${RM('SLA 1ª resposta',DB.sla1r[idx]||'—')}
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        <span class="rel-chip">Instagram comentários: <strong style="margin-left:4px">${fmtNum(DB.igCom[idx])}</strong></span>
+        <span class="rel-chip">Instagram DMs: <strong style="margin-left:4px">${fmtNum(DB.igTk[idx])}</strong></span>
+        <span class="rel-chip">Facebook comentários: <strong style="margin-left:4px">${fmtNum(DB.fbCom[idx])}</strong></span>
+        <span class="rel-chip">Facebook Messenger: <strong style="margin-left:4px">${fmtNum(DB.fbTk[idx])}</strong></span>
+      </div>
+    </div>
+
+    <div class="divider-purple"></div>
+
+    <div class="report-block" id="ai-analysis-block">
+      <h3>Análise inteligente & sugestões
+        <button onclick="gerarAnaliseIA(${idx})" id="btn-ia" style="margin-left:12px;font-size:12px;background:var(--accent);color:#fff;border:none;padding:6px 16px;border-radius:20px;cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:500;display:inline-flex;align-items:center;gap:6px;transition:opacity 0.2s">
+          <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+          Gerar com IA
+        </button>
+      </h3>
+      <div id="ai-loading" style="display:none;padding:20px;background:var(--surface2);border-radius:var(--radius);font-size:13px;color:var(--accent);text-align:center">
+        <span style="display:inline-block;animation:pulse 1.2s ease-in-out infinite">✦ Analisando os indicadores do mês...</span>
+      </div>
+      <div id="ai-result" style="display:none;display:none">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+          <div>
+            <div style="font-size:11px;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:6px">Como foi o mês</div>
+            <div id="ai-mes" class="report-text" style="line-height:1.8"></div>
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:6px">Evolução vs mês anterior</div>
+            <div id="ai-evolucao" class="report-text" style="line-height:1.8"></div>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:6px">Sugestões de melhoria baseadas nos dados</div>
+          <div id="ai-sugestoes" class="report-text" style="line-height:1.8"></div>
+        </div>
+      </div>
+      <div id="ai-placeholder" class="report-text" style="color:var(--text3);font-style:italic">Clique em "Gerar com IA" para gerar automaticamente análise do mês, comparação com o anterior e sugestões de melhoria baseadas nos indicadores. Informe sua API key Anthropic na barra lateral.</div>
+    </div>
+
+    <div class="divider-purple"></div>
+    <div class="grid-2" style="margin-bottom:0">
+      <div class="report-block" style="margin-bottom:0"><h3>Ações realizadas</h3><div class="report-text">${acao}</div></div>
+      <div class="report-block" style="margin-bottom:0"><h3>Melhorias implementadas</h3><div class="report-text">${mel}</div></div>
+    </div>
+    <div class="grid-2" style="margin-top:16px;margin-bottom:0">
+      <div class="report-block" style="margin-bottom:0"><h3>Planejamentos</h3><div class="report-text">${plan}</div></div>
+    </div>
+  </div>`;
+}
+
+// ANÁLISE IA
+async function gerarAnaliseIA(idx){
+  const btn=document.getElementById('btn-ia');
+  const loading=document.getElementById('ai-loading');
+  const result=document.getElementById('ai-result');
+  const placeholder=document.getElementById('ai-placeholder');
+  if(!btn) return;
+
+  btn.disabled=true;
+  btn.style.opacity='0.6';
+  loading.style.display='block';
+  result.style.display='none';
+  placeholder.style.display='none';
+
+  const m=MONTH_FULL[idx]||MONTH_LABELS[idx];
+  const prev=idx>0?idx-1:null;
+  const pm=prev!==null?(MONTH_FULL[prev]||MONTH_LABELS[prev]):'mês anterior';
+
+  const dv=(key)=>DB[key]?.[idx]??null;
+  const dp=(key)=>prev!==null?(DB[key]?.[prev]??null):null;
+  const pct=(a,b)=>{
+    if(a===null||b===null||b===0) return '—';
+    const v=((a-b)/Math.abs(b)*100);
+    return (v>0?'+':'')+v.toFixed(1)+'%';
+  };
+
+  const totalCom=(dv('igCom')||0)+(dv('fbCom')||0);
+  const prevCom=prev!==null?((dp('igCom')||0)+(dp('fbCom')||0)):null;
+  const totalDM=(dv('igTk')||0)+(dv('fbTk')||0);
+  const prevDM=prev!==null?((dp('igTk')||0)+(dp('fbTk')||0)):null;
+
+  const dados=`MÊS ATUAL: ${m}${prev!==null?' | MÊS ANTERIOR: '+pm:''}
+
+FINANCEIRO:
+- Custo área: ${fmtBRL(dv('custo'))}${prev!==null?' (anterior: '+fmtBRL(dp('custo'))+' | var: '+pct(dv('custo'),dp('custo'))+')':''}
+- ROL Appmax: ${fmtBRL(dv('rol'))}
+- % sobre ROL: ${dv('pctRol')!=null?dv('pctRol')+'%':'—'}
+- Colaboradores: ${dv('colaboradores')}
+
+ESTORNOS:
+- Quantidade: ${fmtNum(dv('estQtd'))}${prev!==null?' (anterior: '+fmtNum(dp('estQtd'))+' | var: '+pct(dv('estQtd'),dp('estQtd'))+')':''}
+- Valor total: ${fmtBRL(dv('estVal'))}${prev!==null?' (anterior: '+fmtBRL(dp('estVal'))+' | var: '+pct(dv('estVal'),dp('estVal'))+')':''}
+- Por meio: Pix ${fmtBRL(dv('estPix'))} | Boleto ${fmtBRL(dv('estBoleto'))} | Cartão ${fmtBRL(dv('estCartao'))}
+
+RECLAME AQUI:
+- Nota: ${dv('raNota')}${prev!==null?' (anterior: '+dp('raNota')+' | var: '+pct(dv('raNota'),dp('raNota'))+')':''}
+- Reputação: ${dv('raRep')}
+- Reclamações: ${fmtNum(dv('raQtd'))}${prev!==null?' (anterior: '+fmtNum(dp('raQtd'))+' | var: '+pct(dv('raQtd'),dp('raQtd'))+')':''}
+- Moderações: ${fmtNum(dv('raMod'))}
+- Avaliações positivas: ${fmtNum(dv('raPos'))} | negativas: ${fmtNum(dv('raNeg'))}
+- Índice solução: ${dv('raSol')!=null?dv('raSol')+'%':'—'}${prev!==null?' (anterior: '+(dp('raSol')!=null?dp('raSol')+'%':'—')+' | var: '+pct(dv('raSol'),dp('raSol'))+')':''}
+- Índice novos negócios: ${dv('raNovNeg')!=null?dv('raNovNeg')+'%':'—'}${prev!==null?' (anterior: '+(dp('raNovNeg')!=null?dp('raNovNeg')+'%':'—')+' | var: '+pct(dv('raNovNeg'),dp('raNovNeg'))+')':''}
+
+TICKETS:
+- Respondidos: ${fmtNum(dv('tkTotal'))}${prev!==null?' (anterior: '+fmtNum(dp('tkTotal'))+' | var: '+pct(dv('tkTotal'),dp('tkTotal'))+')':''}
+- Pré-tickets: ${fmtNum(dv('preTk'))}${prev!==null?' (anterior: '+fmtNum(dp('preTk'))+' | var: '+pct(dv('preTk'),dp('preTk'))+')':''}
+- Backlog médio: ${fmtNum(dv('backlog'))}${prev!==null?' (anterior: '+fmtNum(dp('backlog'))+' | var: '+pct(dv('backlog'),dp('backlog'))+')':''}
+- SLA ticket: ${dv('slaTicket')||'—'}${prev!==null?' (anterior: '+(dp('slaTicket')||'—')+')':''}
+- Disparos automação: ${dv('disparos')!=null?fmtNum(dv('disparos')):'Não iniciado'}
+
+MÍDIAS SOCIAIS:
+- Total comentários: ${fmtNum(totalCom)}${prevCom!==null?' (anterior: '+fmtNum(prevCom)+' | var: '+pct(totalCom,prevCom)+')':''}
+- Total DMs: ${fmtNum(totalDM)}${prevDM!==null?' (anterior: '+fmtNum(prevDM)+' | var: '+pct(totalDM,prevDM)+')':''}
+- IG comentários: ${fmtNum(dv('igCom'))} | IG mensagens: ${fmtNum(dv('igTk'))}
+- FB comentários: ${fmtNum(dv('fbCom'))} | FB Messenger: ${fmtNum(dv('fbTk'))}
+- SLA comentário: ${dv('slaCom')||'—'}${prev!==null?' (anterior: '+(dp('slaCom')||'—')+')':''}
+- SLA 1ª resposta: ${dv('sla1r')||'—'}${prev!==null?' (anterior: '+(dp('sla1r')||'—')+')':''}`;
+
+  const prompt=`Você é analista sênior de atendimento B2C. Com base nos dados abaixo, escreva exatamente 3 blocos em português brasileiro, profissional e objetivo. Use APENAS este formato:
+
+[COMO_FOI_O_MES]
+(Um parágrafo descrevendo o desempenho geral de ${m}, comentando cada frente: financeiro, estornos, Reclame Aqui, tickets e mídias sociais. Destaque pontos positivos e negativos com base nos números.)
+
+[EVOLUCAO_VS_ANTERIOR]
+(Um parágrafo comparando ${m} com ${pm}. Destaque o que melhorou, o que piorou e o que se manteve estável. Seja específico com as variações percentuais.)
+
+[SUGESTOES]
+(De 3 a 5 sugestões práticas e específicas de melhoria baseadas nos pontos mais fracos ou nas maiores variações negativas identificadas nos dados. Cada sugestão em uma frase direta.)
+
+${dados}`;
+
+  try{
+    const response=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'anthropic-dangerous-direct-browser-access':'true'
+      },
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:1200,
+        messages:[{role:'user',content:prompt}]
+      })
+    });
+
+    if(!response.ok){
+      const err=await response.json().catch(()=>({}));
+      throw new Error(err.error?.message||'Erro HTTP '+response.status);
+    }
+
+    const data=await response.json();
+    const text=data.content?.[0]?.text||'';
+    if(!text) throw new Error('Resposta vazia da API');
+
+    const extract=(tag)=>{
+      const re=new RegExp('\\['+tag+'\\]\\s*([\\s\\S]*?)(?=\\[|$)','i');
+      const match=text.match(re);
+      return match?match[1].trim():'';
+    };
+
+    const p1=extract('COMO_FOI_O_MES')||text.split('\n\n')[0]||text;
+    const p2=extract('EVOLUCAO_VS_ANTERIOR')||text.split('\n\n')[1]||'';
+    const p3=extract('SUGESTOES')||text.split('\n\n')[2]||'';
+
+    document.getElementById('ai-mes').textContent=p1;
+    document.getElementById('ai-evolucao').textContent=p2||'Não há dados do mês anterior para comparação.';
+    document.getElementById('ai-sugestoes').textContent=p3||'—';
+
+    result.style.display='block';
+    loading.style.display='none';
+    btn.innerHTML='<svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Gerar novamente';
+    btn.disabled=false;
+    btn.style.opacity='1';
+
+  }catch(e){
+    loading.style.display='none';
+    placeholder.style.display='block';
+    placeholder.style.color='var(--red)';
+    placeholder.style.fontStyle='normal';
+    placeholder.innerHTML=`<strong>Erro ao gerar análise:</strong> ${e.message}<br><span style="font-size:12px;color:var(--text3)">Esta função requer que o painel esteja hospedado online (Netlify). No arquivo local o navegador bloqueia por segurança.</span>`;
+    btn.disabled=false;
+    btn.style.opacity='1';
+  }
+}
+
+// BONIFICAÇÃO
+let bonusPeriod='trimestre';
+function setBonusPeriod(p,el){bonusPeriod=p;document.querySelectorAll('.period-tab').forEach(t=>t.classList.remove('active'));if(el)el.classList.add('active');renderBonificacao();}
+function getFilteredBonus(){
+  const ORDER=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  if(bonusPeriod==='trimestre'){const mi=ORDER.indexOf('Março');const months=ORDER.slice(Math.max(0,mi-2),mi+1);return BONUS_DATA.filter(d=>d.ano===2026&&months.includes(d.mes));}
+  if(bonusPeriod==='ano')return BONUS_DATA.filter(d=>d.ano===2026);
+  return BONUS_DATA;
+}
+function renderBonificacao(){
+  const data=getFilteredBonus();
+  const analysts=[...new Set(BONUS_DATA.map(d=>d.analista))];
+  const totalBonus=data.filter(d=>d.score>=4).length;
+  const totalValue=data.filter(d=>d.score>=4).reduce((s,d)=>s+(BONUS_BY_SCORE[d.score]||0),0);
+  const avgScore=data.length?(data.reduce((s,d)=>s+d.score,0)/data.length):0;
+  const topAnalyst=analysts.reduce((best,a)=>{const w=data.filter(d=>d.analista===a&&d.score>=4).length;const bw=data.filter(d=>d.analista===best&&d.score>=4).length;return w>bw?a:best;},analysts[0]||'—');
+
+  document.getElementById('bonus-kpis').innerHTML=[
+    {label:'Bônus concedidos',val:totalBonus+' vezes',sub:'score ≥ 4'},
+    {label:'Total em bônus',val:fmtBRL(totalValue),sub:'período selecionado'},
+    {label:'Score médio',val:avgScore.toFixed(1),sub:'de 5 pontos'},
+    {label:'Destaque do período',val:topAnalyst,sub:'mais bônus ganhos'},
+  ].map(k=>`<div class="metric-card"><div class="m-label">${k.label}</div><div class="m-value">${k.val}</div><div style="font-size:11px;color:var(--text3);margin-top:4px">${k.sub}</div></div>`).join('');
+
+  document.getElementById('analysts-grid').innerHTML=analysts.map(name=>{
+    const rows=data.filter(d=>d.analista===name);
+    if(!rows.length)return'';
+    const allR=BONUS_DATA.filter(d=>d.analista===name);
+    const nivel=allR[allR.length-1]?.nivel||'—';
+    const area=allR[0]?.area||'—';
+    const won=rows.filter(d=>d.score>=4).length;
+    const totalVal=rows.filter(d=>d.score>=4).reduce((s,d)=>s+(BONUS_BY_SCORE[d.score]||0),0);
+    const scores=rows.map(d=>d.score);
+    const avgS=(scores.reduce((a,b)=>a+b,0)/scores.length)||0;
+    const freq={};scores.forEach(s=>freq[s]=(freq[s]||0)+1);
+    const prevScore=Object.entries(freq).sort((a,b)=>b[1]-a[1])[0]?.[0]||'—';
+    const timeline=rows.map(d=>`<span class="mt-chip score-${d.score}" title="${d.avaliacao}">${d.mes.substring(0,3)} ${d.score}★</span>`).join('');
+    return`<div class="analyst-card"><div class="analyst-header"><div class="analyst-avatar">${initials(name)}</div><div><div class="analyst-name">${name}</div><div class="analyst-role">${nivel} · ${area}</div></div></div><div class="analyst-stats"><div class="analyst-stat"><div class="as-val">${won}/${rows.length}</div><div class="as-label">Bônus ganhos</div></div><div class="analyst-stat"><div class="as-val">${avgS.toFixed(1)}</div><div class="as-label">Score médio</div></div><div class="analyst-stat"><div class="as-val" style="font-size:14px">${fmtBRL(totalVal)}</div><div class="as-label">Total bônus</div></div></div><div style="margin-top:10px;font-size:11px;color:var(--text3);margin-bottom:4px">Score prevalente: ${scoreBadge(parseInt(prevScore))} ${scoreLabel(parseInt(prevScore))}</div><div class="month-timeline">${timeline}</div></div>`;
+  }).join('');
+
+  let thtml=`<table><thead><tr><th>Analista</th><th>Área</th><th>Nível</th><th>Mês/Ano</th><th>Score</th><th>Avaliação</th><th>Bônus</th></tr></thead><tbody>`;
+  [...data].sort((a,b)=>{const o=['Nov','Dez','Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out'];return a.analista.localeCompare(b.analista)||(a.ano-b.ano)||(o.indexOf(a.mes.substring(0,3))-o.indexOf(b.mes.substring(0,3)));}).forEach(d=>{
+    const won=d.score>=4;const bv=won?(BONUS_BY_SCORE[d.score]||0):0;
+    thtml+=`<tr${won?' class="bonus-row-won"':''}><td style="font-weight:500">${d.analista}</td><td class="cat">${d.area}</td><td class="cat">${d.nivel}</td><td>${d.mes}/${d.ano}</td><td>${scoreBadge(d.score)}</td><td style="color:var(--text2);font-size:12px">${d.avaliacao}</td><td>${won?`<span class="badge badge-green">${fmtBRL(bv)}</span>`:'<span class="badge badge-neutral">—</span>'}</td></tr>`;
+  });
+  document.getElementById('bonus-table').innerHTML=thtml+'</tbody></table>';
+
+  dc('ch-bonus-score');
+  CH['ch-bonus-score']=new Chart(document.getElementById('ch-bonus-score'),{type:'bar',data:{labels:analysts,datasets:[{data:analysts.map(a=>{const r=data.filter(d=>d.analista===a);return r.length?(r.reduce((s,d)=>s+d.score,0)/r.length).toFixed(2):0;}),backgroundColor:PC.slice(0,analysts.length),borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{min:0,max:5,ticks:{font:{size:11}}},x:{ticks:{font:{size:11}}}}}});
+  dc('ch-bonus-count');
+  CH['ch-bonus-count']=new Chart(document.getElementById('ch-bonus-count'),{type:'bar',data:{labels:analysts,datasets:[{data:analysts.map(a=>data.filter(d=>d.analista===a&&d.score>=4).length),backgroundColor:PC.slice(0,analysts.length),borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{stepSize:1,font:{size:11}}},x:{ticks:{font:{size:11}}}}}});
+}
+
+// SALVAR MÊS
+function salvarMes(){
+  const mes=document.getElementById('f-mes').value;
+  const ano=document.getElementById('f-ano').value;
+  const label=mes.substring(0,3)+'/'+String(ano).slice(-2);
+  let idx=MONTH_LABELS.indexOf(label);
+  if(idx===-1){MONTH_LABELS.push(label);MONTH_FULL.push(mes+'/'+ano);idx=MONTH_LABELS.length-1;Object.keys(DB).forEach(k=>{if(Array.isArray(DB[k]))DB[k].push(null);});}
+  const g=id=>document.getElementById(id);
+  DB.colaboradores[idx]=parseInt(g('f-colab').value)||null;
+  DB.custo[idx]=parseBRL(g('f-custo').value);
+  DB.rol[idx]=parseBRL(g('f-rol').value);
+  DB.pctRol[idx]=parseFloat(g('f-pct').value)||null;
+  DB.estQtd[idx]=parseInt(g('f-est-qtd').value)||null;
+  DB.estVal[idx]=parseBRL(g('f-est-val').value);
+  DB.estPix[idx]=parseBRL(g('f-est-pix').value);
+  DB.estBoleto[idx]=parseBRL(g('f-est-boleto').value);
+  DB.estCartao[idx]=parseBRL(g('f-est-cartao').value);
+  DB.cbkQtd[idx]=parseInt(g('f-cbk-qtd').value)||null;
+  DB.cbkVal[idx]=parseBRL(g('f-cbk-val').value);
+  DB.raQtd[idx]=parseInt(g('f-ra-qtd').value)||null;
+  DB.raNota[idx]=parseFloat(g('f-ra-nota').value)||null;
+  DB.raRep[idx]=g('f-ra-rep').value||null;
+  DB.raSol[idx]=parseFloat(g('f-ra-sol').value)||null;
+  DB.raNovNeg[idx]=parseFloat(g('f-ra-neg').value)||null;
+  DB.raPos[idx]=parseInt(g('f-ra-pos').value)||null;
+  DB.raNeg[idx]=parseInt(g('f-ra-neg2').value)||null;
+  DB.raMod[idx]=parseInt(g('f-ra-mod').value)||null;
+  DB.tkTotal[idx]=parseInt(g('f-tk-total').value)||DB.tkTotal[idx]||null;
+  DB.disparos[idx]=parseInt(g('f-disparos').value)||null;
+  DB.slaTicket[idx]=g('f-sla-tk').value||null;
+  DB.sla1r[idx]=g('f-sla-1r').value||null;
+  DB.slaCom[idx]=g('f-sla-com').value||null;
+  DB.usuarios[idx]=parseInt(g('f-usuarios').value)||null;
+  DB.igCom[idx]=parseInt(g('f-ig-com').value)||null;
+  DB.igTk[idx]=parseInt(g('f-ig').value)||null;
+  DB.fbCom[idx]=parseInt(g('f-fb-com').value)||null;
+  DB.fbTk[idx]=parseInt(g('f-fb').value)||null;
+  DB.acoes[idx]=g('f-acoes').value||'';
+  DB.melhorias[idx]=g('f-melhorias').value||'';
+  DB.sugestoes[idx]=g('f-sugestoes').value||'';
+  DB.planejamentos[idx]=g('f-planejamentos').value||'';
+  saveDB();populateSelects();
+  toast('Mês '+label+' salvo!');
+  document.getElementById('save-msg').textContent='✓ Salvo!';
+  setTimeout(()=>{document.getElementById('save-msg').textContent='';},3000);
+}
+function limparForm(){
+  ['f-colab','f-custo','f-rol','f-pct','f-est-qtd','f-est-val','f-est-pix','f-est-boleto','f-est-cartao','f-ra-qtd','f-ra-nota','f-ra-rep','f-ra-sol','f-ra-neg','f-ra-pos','f-ra-neg2','f-ra-mod','f-tk-total','f-disparos','f-sla-tk','f-sla-1r','f-sla-com','f-usuarios','f-ig-com','f-ig','f-fb-com','f-fb','f-acoes','f-melhorias','f-sugestoes','f-planejamentos']
+  .forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+}
+
+// EXPORT
+function downloadCSV(rows,fname){const csv=rows.map(r=>r.map(c=>{const s=String(c);return s.includes(',')||s.includes('"')?`"${s}"`:s;}).join(',')).join('\n');const b=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=fname;a.click();URL.revokeObjectURL(u);}
+function exportCSV(){
+  const cols=['Indicador',...MONTH_LABELS];
+  const rows=[
+    ['Custo área',...DB.custo.map(v=>v!=null?fmtBRL(v):'')],
+    ['Colaboradores',...DB.colaboradores.map(v=>v??'')],
+    ['ROL Appmax',...DB.rol.map(v=>v!=null?fmtBRL(v):'')],
+    ['Qtd RA',...DB.raQtd.map(v=>v??'')],['Nota RA',...DB.raNota.map(v=>v??'')],['Reputação',...DB.raRep.map(v=>v??'')],
+    ['Índice solução',...DB.raSol.map(v=>v!=null?v+'%':'')],['Índice novos negócios',...DB.raNovNeg.map(v=>v!=null?v+'%':'')],
+    ['IG comentários',...DB.igCom.map(v=>v??'')],['IG mensagens',...DB.igTk.map(v=>v??'')],
+    ['FB comentários',...DB.fbCom.map(v=>v??'')],['FB Messenger',...DB.fbTk.map(v=>v??'')],
+    ['SLA comentário',...DB.slaCom.map(v=>v??'')],['SLA 1ª resposta',...DB.sla1r.map(v=>v??'')],
+    ['Tickets respondidos',...DB.tkTotal.map(v=>v??'')],['Disparos automação',...DB.disparos.map(v=>v??'')],['SLA ticket',...DB.slaTicket.map(v=>v??'')],
+    ['Estornos qtd',...DB.estQtd.map(v=>v??'')],['Estornos valor',...DB.estVal.map(v=>v!=null?fmtBRL(v):'')],
+    ['CBK qtd',...DB.cbkQtd.map(v=>v??'')],['CBK valor',...DB.cbkVal.map(v=>v!=null?fmtBRL(v):'')],
+    ['Ações',...DB.acoes.map(v=>`"${(v||'').replace(/"/g,'""')}"`)]
+  ];
+  downloadCSV([cols,...rows],'dados_b2c_'+new Date().toISOString().slice(0,10)+'.csv');toast('CSV exportado!');
+}
+function exportBonusCSV(){
+  const data=getFilteredBonus();
+  const rows=[['Analista','Área','Nível','Mês','Ano','Score','Avaliação','Bônus?','Valor']];
+  data.forEach(d=>{const w=d.score>=4;rows.push([d.analista,d.area,d.nivel,d.mes,d.ano,d.score,d.avaliacao,w?'Sim':'Não',w?(BONUS_BY_SCORE[d.score]||0):0]);});
+  downloadCSV(rows,'bonificacao_'+bonusPeriod+'.csv');toast('Bonificação exportada!');
+}
+function exportComparativoCSV(){
+  const idx=parseInt(document.getElementById('sel-comp').value);
+  const idxs=[...new Set([Math.max(0,idx-2),Math.max(0,idx-1),idx])];while(idxs.length<3)idxs.unshift(idxs[0]);
+  const labels=idxs.map(i=>MONTH_LABELS[i]);
+  const rows=[['Indicador',...labels,'Variação %'],
+    ['Custo área',...idxs.map(i=>fmtBRL(DB.custo[i])),calcDelta(DB.custo[idxs[1]],DB.custo[idxs[2]])],
+    ['Tickets respondidos',...idxs.map(i=>DB.tkTotal[i]??''),calcDelta(DB.tkTotal[idxs[1]],DB.tkTotal[idxs[2]])],
+    ['Nota RA',...idxs.map(i=>DB.raNota[i]??''),calcDelta(DB.raNota[idxs[1]],DB.raNota[idxs[2]])],
+  ];
+  downloadCSV(rows,'comparativo_'+MONTH_LABELS[idx]+'.csv');toast('Comparativo exportado!');
+}
+function exportRelatorioCSV(){
+  const idx=parseInt(document.getElementById('sel-rel').value);
+  const rows=[['Campo','Valor'],['Mês',MONTH_FULL[idx]||MONTH_LABELS[idx]],['Colaboradores',DB.colaboradores[idx]??''],
+    ['Custo área',fmtBRL(DB.custo[idx])],['ROL Appmax',fmtBRL(DB.rol[idx])],
+    ['Nota RA',DB.raNota[idx]??''],['Reputação',DB.raRep[idx]??''],
+    ['Tickets respondidos',DB.tkTotal[idx]??''],['Disparos automação',DB.disparos[idx]??''],
+    ['Total comentários',(DB.igCom[idx]||0)+(DB.fbCom[idx]||0)],['Total DMs',(DB.igTk[idx]||0)+(DB.fbTk[idx]||0)],
+    ['Ações','"'+(DB.acoes[idx]||'').replace(/"/g,'""')+'"'],['Melhorias','"'+(DB.melhorias[idx]||'').replace(/"/g,'""')+'"'],
+  ];
+  downloadCSV(rows,'relatorio_'+MONTH_LABELS[idx]+'.csv');toast('Relatório exportado!');
+}
+
+// IMPORT
+function dragOver(e,id){e.preventDefault();document.getElementById(id).classList.add('drag');}
+function dragLeave(id){document.getElementById(id).classList.remove('drag');}
+function dropFile(e,type){e.preventDefault();if(type==='ind'){dragLeave('upload-zone1');handleIndicadoresFile(e.dataTransfer.files[0]);}else{dragLeave('upload-zone2');handleBonusFile(e.dataTransfer.files[0]);}}
+
+function handleIndicadoresFile(file){
+  if(!file)return;
+  const log=document.getElementById('import-log1');
+  log.innerHTML='<span style="color:var(--accent)">Lendo arquivo...</span>';
+
+  Papa.parse(file,{complete:function(results){
+    try{
+      const rows=results.data;
+
+      // ── Mapeamento robusto de meses ─────────────────────────────────────
+      // Aceita: "Abril", "abril", "Abr/25", "abr", "Apr", "4", "04", etc.
+      const MESES_MAP={
+        'jan':0,'fev':1,'mar':2,'abr':3,'mai':4,'jun':5,
+        'jul':6,'ago':7,'set':8,'out':9,'nov':10,'dez':11,
+        'january':0,'february':1,'march':2,'april':3,'may':4,'june':5,
+        'july':6,'august':7,'september':8,'october':9,'november':10,'december':11,
+        'janeiro':0,'fevereiro':1,'março':2,'abril':3,'maio':4,'junho':5,
+        'julho':6,'agosto':7,'setembro':8,'outubro':9,'novembro':10,'dezembro':11
+      };
+      // Anos disponíveis na planilha (col header pode ter "2026" numa linha separada)
+      // Estratégia: varre TODAS as linhas procurando colunas com nomes de meses
+      let mMap={}; // colIndex → MONTH_LABELS index
+
+      // Tenta encontrar linha de cabeçalho com meses (qualquer das primeiras 5 linhas)
+      let headerRowIdx=-1;
+      let yearCtx=2025; // ano padrão, atualiza quando vê "2026" no CSV
+
+      for(let ri=0;ri<Math.min(5,rows.length);ri++){
+        const row=rows[ri];
+        let found=0;
+        const tempMap={};
+        let localYear=2025;
+        for(let ci=0;ci<row.length;ci++){
+          const cell=String(row[ci]||'').trim().toLowerCase();
+          if(!cell) continue;
+          // Se a célula é apenas um ano (ex: "2026"), atualiza contexto de ano
+          if(/^20\d\d$/.test(cell)){localYear=parseInt(cell);continue;}
+          // Tenta match de mês
+          const key=cell.replace(/[^a-záéíóúâêîôûãõç]/gi,'').toLowerCase().substring(0,3);
+          if(MESES_MAP[key]!==undefined){
+            // Determina o ano: se mês <= mês atual do contexto, provavelmente mudou de ano
+            const mIdx=MESES_MAP[key];
+            // Usa o ano que vem antes no header ("2026" na col L do CSV original)
+            tempMap[ci]={mIdx,year:localYear};
+            found++;
+          }
+        }
+        if(found>=3){headerRowIdx=ri;mMap=tempMap;break;}
+      }
+
+      // Converte mMap para índice em MONTH_LABELS
+      // MONTH_LABELS = ['Abr/25','Mai/25',...,'Jan/26','Fev/26','Mar/26']
+      // Meses: Abr/25=idx0 ... Dez/25=idx8, Jan/26=idx9, Fev/26=idx10, Mar/26=idx11
+      const LABEL_TO_IDX={};
+      MONTH_LABELS.forEach((l,i)=>LABEL_TO_IDX[l]=i);
+
+      // Build col→dbIdx map
+      const colToDbIdx={};
+      if(headerRowIdx>=0){
+        // Reconstruct with proper year tracking
+        const headerRow=rows[headerRowIdx];
+        let curYear=2025;
+        for(let ci=0;ci<headerRow.length;ci++){
+          const cell=String(headerRow[ci]||'').trim();
+          if(/^20\d\d$/.test(cell)){curYear=parseInt(cell);continue;}
+          const key=cell.toLowerCase().replace(/[^a-záéíóúâêîôûãõç]/gi,'').substring(0,3);
+          if(MESES_MAP[key]!==undefined){
+            const mIdx=MESES_MAP[key];
+            const shortYear=String(curYear).slice(-2);
+            const MONTH_SHORT=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+            const label=MONTH_SHORT[mIdx]+'/'+shortYear;
+            const dbIdx=LABEL_TO_IDX[label];
+            if(dbIdx!==undefined) colToDbIdx[ci]=dbIdx;
+          }
+        }
+      }
+
+      if(Object.keys(colToDbIdx).length===0){
+        log.innerHTML=`<span style="color:var(--red)">Não encontrei colunas de meses reconhecíveis. Verifique se o CSV tem os nomes dos meses no cabeçalho (ex: Abril, Maio, Janeiro...).</span>`;
+        return;
+      }
+
+      let n=0;
+      const set=(key,parser,row)=>{
+        Object.entries(colToDbIdx).forEach(([ci,dbIdx])=>{
+          const raw=String(row[ci]||'').trim();
+          if(!raw||raw==='-'||raw==='—') return;
+          const v=parser(raw);
+          if(v!==null&&v!==undefined&&!isNaN(v)){
+            DB[key][dbIdx]=v;n++;
+          }
+        });
+      };
+      const setStr=(key,row)=>{
+        Object.entries(colToDbIdx).forEach(([ci,dbIdx])=>{
+          const raw=String(row[ci]||'').trim();
+          if(!raw||raw==='-'||raw==='—') return;
+          DB[key][dbIdx]=raw;n++;
+        });
+      };
+
+      rows.forEach(row=>{
+        const c0=String(row[0]||'').trim().toLowerCase();
+        const c1=String(row[1]||'').trim().toLowerCase();
+        const ind=c1||c0;
+        if(!ind||ind.length<3) return;
+
+        if(ind.includes('custo'))                                         set('custo',parseBRL,row);
+        else if(ind.includes('colaborador'))                              set('colaboradores',s=>parseInt(s)||null,row);
+        else if(ind.includes('rol appmax'))                               set('rol',parseBRL,row);
+        else if(ind.includes('% em relação')||ind.includes('% sobre'))   set('pctRol',s=>parseFloat(s.replace('%','').replace(',','.'))||null,row);
+        else if(ind.includes('estornos em $')||ind.includes('estorno em $')) set('estVal',parseBRL,row);
+        else if(ind.includes('estorno em #')||ind.includes('estornos em #')) set('estQtd',s=>parseInt(s.replace(/\D/g,''))||null,row);
+        else if(ind==='pix'&&c0==='')                                     set('estPix',parseBRL,row);
+        else if(ind==='boleto'&&c0==='')                                  set('estBoleto',parseBRL,row);
+        else if(ind==='cartão'&&c0==='')                                  set('estCartao',parseBRL,row);
+        else if(ind.includes('quantidade ra')&&!ind.includes('mod')&&!ind.includes('+')) set('raQtd',s=>parseInt(s.replace(/\D/g,''))||null,row);
+        else if(ind.includes('moderaç'))                                  set('raMod',s=>parseInt(s.replace(/\D/g,''))||null,row);
+        else if(ind==='nota')                                             set('raNota',s=>parseFloat(s.replace(',','.'))||null,row);
+        else if(ind.includes('avaliações positivas'))                     set('raPos',s=>parseInt(s.replace(/\D/g,''))||null,row);
+        else if(ind.includes('avaliações negativas'))                     set('raNeg',s=>parseInt(s.replace(/\D/g,''))||null,row);
+        else if(ind.includes('reputaç'))                                  setStr('raRep',row);
+        else if(ind.includes('indice de soluç')||ind.includes('índice de soluç')) set('raSol',s=>parseFloat(s.replace('%','').replace(',','.'))||null,row);
+        else if(ind.includes('novos negócios')||ind.includes('novos negocios'))   set('raNovNeg',s=>parseFloat(s.replace('%','').replace(',','.'))||null,row);
+        else if(ind.includes('instagram comentários')||ind.includes('instagram comentarios')) set('igCom',s=>parseInt(s.replace(/\./g,'').replace(/\D/g,''))||null,row);
+        else if(ind.includes('instagram mensagens'))                      set('igTk',s=>parseInt(s.replace(/\D/g,''))||null,row);
+        else if(ind.includes('facebook comentários')||ind.includes('facebook comentarios'))   set('fbCom',s=>parseInt(s.replace(/\D/g,''))||null,row);
+        else if(ind.includes('facebook mensagens'))                       set('fbTk',s=>parseInt(s.replace(/\D/g,''))||null,row);
+        else if(ind.includes('sla comentario')||ind.includes('sla comentário'))   setStr('slaCom',row);
+        else if(ind.includes('sla 1 resposta')||ind.includes('sla 1'))            setStr('sla1r',row);
+        else if(ind.includes('sla ticket'))                               setStr('slaTicket',row);
+        else if(ind.includes('quantidade tickets'))                       set('tkTotal',s=>parseInt(s.replace(/\./g,'').replace(/\D/g,''))||null,row);
+        else if(ind.includes('pré tickets')||ind.includes('pre tickets')) set('preTk',s=>parseInt(s.replace(/\./g,'').replace(/\D/g,''))||null,row);
+        else if(ind.includes('média backlog')||ind.includes('media backlog')) set('backlog',s=>{const v=parseFloat(s.replace(',','.'));return isNaN(v)?null:v;},row);
+        else if(ind.includes('disparos'))                                 set('disparos',s=>parseInt(s.replace(/\D/g,''))||null,row);
+        else if(ind.includes('volume de usuários')||ind.includes('volume de usuarios')) set('usuarios',s=>parseInt(s.replace(/\D/g,''))||null,row);
+      });
+
+      saveDB();
+      populateSelects();
+      const meses=Object.values(colToDbIdx).map(i=>MONTH_LABELS[i]).join(', ');
+      log.innerHTML=`<span style="color:var(--green);font-weight:500">✓ ${n} valores importados</span><br><span style="font-size:12px;color:var(--text3)">Meses detectados: ${meses}</span>`;
+      toast('Planilha importada!');
+      // Refresh current view
+      renderOverview();
+
+    }catch(err){
+      log.innerHTML=`<span style="color:var(--red)">Erro: ${err.message}</span>`;
+      console.error(err);
+    }
+  },header:false,skipEmptyLines:false});
+}
+
+function handleBonusFile(file){
+  if(!file)return;
+  const log=document.getElementById('import-log2');
+  log.textContent='Lendo...';
+  Papa.parse(file,{complete:function(results){
+    try{
+      const rows=results.data;let area='';let n=0;const nb=[];
+      const sCols={Ticket:6,'Mídias Sociais':7,'Reclame Aqui':8};
+      const aCols={Ticket:7,'Mídias Sociais':8,'Reclame Aqui':9};
+      rows.forEach(row=>{
+        const f=String(row[0]||'').trim();
+        if(['Ticket','Mídias Sociais','Reclame Aqui'].includes(f)){area=f;return;}
+        if(!f||f==='Analista')return;
+        const nivel=String(row[1]||'').trim();
+        const mes=String(row[2]||'').trim().replace(/\s/g,'');
+        if(!nivel||!mes)return;
+        const score=parseInt(String(row[sCols[area]??6]||'').trim())||null;
+        if(!score)return;
+        const aval=String(row[aCols[area]??7]||'').trim();
+        const ano=['Novembro','Dezembro'].includes(mes)?2025:2026;
+        nb.push({analista:f,area,nivel,mes,ano,score,avaliacao:aval});n++;
+      });
+      if(n>0){BONUS_DATA=nb;saveBonusDB();log.innerHTML=`<span style="color:var(--green);font-weight:500">✓ ${n} registros importados</span>`;toast('Bonificação importada!');}
+      else log.innerHTML=`<span style="color:var(--amber)">Nenhum score encontrado. Verifique o formato.</span>`;
+    }catch(err){log.innerHTML=`<span style="color:var(--red)">Erro: ${err.message}</span>`;}
+  }});
+}
+
+// ─── PUBLICAR ────────────────────────────────────────────────────────────────
+function gerarEPublicar(){
+  const dbJson=JSON.stringify(DB);
+  const bonusJson=JSON.stringify(BONUS_DATA);
+  const labelsJson=JSON.stringify(MONTH_LABELS);
+  const fullJson=JSON.stringify(MONTH_FULL);
+
+  let src=document.documentElement.outerHTML;
+
+  // Injeta dados atuais
+  src=src.replace(/const MONTH_LABELS=\[.*?\];/, `const MONTH_LABELS=${labelsJson};`);
+  src=src.replace(/const MONTH_FULL=\[.*?\];/, `const MONTH_FULL=${fullJson};`);
+  src=src.replace(/let DB=\{[\s\S]*?\};\s*\nconst BONUS_BY_SCORE/, `let DB=${dbJson};\nconst BONUS_BY_SCORE`);
+  src=src.replace(/let BONUS_DATA=\[[\s\S]*?\];[\s\S]*?\/\/ ─── CLOUD SYNC/, `let BONUS_DATA=${bonusJson};\n// ─── CLOUD SYNC`);
+
+  // Remove menu e página de configurar nuvem
+  src=src.replace(/<button[^>]*goTo\('config'[^>]*>[\s\S]*?<\/button>/,'');
+  src=src.replace(/<div class="page" id="page-config">[\s\S]*?<\/div>\s*\n\s*<\/main>/,'</main>');
+
+  // Abre numa nova aba — usuário salva com Ctrl+S como index.html
+  const blob=new Blob([src],{type:'text/html;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const win=window.open(url,'_blank');
+
+  // Instrução clara no toast
+  setTimeout(()=>{
+    toast('Página aberta! Pressione Ctrl+S (ou Cmd+S no Mac) e salve como index.html');
+    URL.revokeObjectURL(url);
+  },800);
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+// Pre-fill config inputs if already configured
+window.addEventListener('DOMContentLoaded',()=>{
+  populateSelects();
+  renderOverview();
+});
+</script>
+</body>
+</html>
